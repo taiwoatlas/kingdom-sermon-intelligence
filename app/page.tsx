@@ -354,7 +354,7 @@ export default function Home() {
                   <label className="field"><span>Social platforms</span><select value={socialPlatforms} onChange={(e) => setSocialPlatforms(e.target.value)}>{PLATFORM_CHOICES.map((item) => <option key={item}>{item}</option>)}</select></label>
                 </div>
               </section>
-              <button className="primary-button" onClick={prepareDrafts} disabled={generating || selectedResourceIds.length === 0} aria-busy={generating}><WandSparkles size={17} /> {generating ? "Generating content…" : "Generate selected content"} <span>→</span></button>
+              <button className="primary-button" onClick={() => void prepareDrafts()} disabled={generating || selectedResourceIds.length === 0} aria-busy={generating}><WandSparkles size={17} /> {generating ? "Generating content…" : "Generate selected content"} <span>→</span></button>
               <p className="button-note">Uses the configured server-side AI provider free tier. A Groq free-plan key must be configured in Vercel; paid usage is not enabled. Every output requires human review.</p>
             </section>
 
