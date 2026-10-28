@@ -64,7 +64,17 @@ export default function CarouselStudio({ content, title, author, onChange }: { c
     const scripture = slide.scripture ? '<text x="90" y="1040" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="700" fill="' + t.accent + '">' + escapeXml(slide.scripture) + "</text>" : "";
     const footer = escapeXml(slide.footer || "SAVE THIS MESSAGE");
     const signature = escapeXml(author?.trim() || "");
-    const motif = '<circle cx="930" cy="180" r="180" fill="' + t.accent + '" opacity=".10"/><path d="M760 90 L1020 350" stroke="' + t.accent + '" stroke-width="3" opacity=".45"/>';
+    const motif = t.key === "botanical"
+      ? '<path d="M790 100 C940 150 970 290 880 410 C840 300 810 220 790 100Z" fill="' + t.accent + '" opacity=".18"/><path d="M790 100 C850 210 875 290 880 410" stroke="' + t.accent + '" stroke-width="5" fill="none" opacity=".55"/>'
+      : t.key === "paper"
+      ? '<path d="M720 85 L1030 135 L960 420 L680 350Z" fill="' + t.accent + '" opacity=".17"/><circle cx="930" cy="220" r="110" fill="' + t.accent + '" opacity=".12"/>'
+      : t.key === "electric"
+      ? '<path d="M760 90 L1030 90 L1030 355 L890 300Z" fill="' + t.accent + '" opacity=".22"/><circle cx="900" cy="250" r="125" fill="none" stroke="' + t.accent + '" stroke-width="3"/>'
+      : t.key === "ocean"
+      ? '<path d="M700 110 Q820 20 940 110 T1180 110" stroke="' + t.accent + '" stroke-width="5" fill="none" opacity=".45"/><path d="M700 160 Q820 70 940 160 T1180 160" stroke="' + t.accent + '" stroke-width="3" fill="none" opacity=".35"/>'
+      : t.key === "midnight"
+      ? '<circle cx="930" cy="180" r="120" fill="' + t.accent + '" opacity=".13"/><circle cx="930" cy="180" r="88" fill="none" stroke="' + t.accent + '" stroke-width="2" opacity=".55"/>'
+      : '<circle cx="930" cy="180" r="180" fill="' + t.accent + '" opacity=".10"/><path d="M760 90 L1020 350" stroke="' + t.accent + '" stroke-width="3" opacity=".45"/>';
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="2160" height="2700" viewBox="0 0 1080 1350"><rect width="1080" height="1350" fill="' + t.bg + '">' + '</rect>' + motif + '<rect x="76" y="80" width="52" height="6" rx="3" fill="' + t.accent + '"/><text x="86" y="150" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="700" letter-spacing="3" fill="' + t.accent + '">' + escapeXml((title || "MESSAGE NOTES").toUpperCase().slice(0, 42)) + '</text>' + heading + body + scripture + '<line x1="86" y1="1160" x2="994" y2="1160" stroke="' + t.accent + '" stroke-opacity=".5"/><text x="86" y="1210" font-family="Arial,Helvetica,sans-serif" font-size="16" letter-spacing="1.4" fill="' + t.text + '" opacity=".68">' + footer + '</text><text x="994" y="1270" text-anchor="end" font-family="Georgia,serif" font-style="italic" font-size="25" fill="' + t.text + '">' + signature + '</text><text x="86" y="1300" font-family="Arial,Helvetica,sans-serif" font-size="12" letter-spacing="2" fill="' + t.accent + '">' + String(index + 1).padStart(2, "0") + " / " + String(deck.slides.length).padStart(2, "0") + '</text></svg>';
     const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
     const filename = (title || "message-carousel").toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-slide-" + (index + 1);
