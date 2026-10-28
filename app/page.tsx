@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import CarouselStudio from "./components/CarouselStudio";
 import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHandshake, Lightbulb, ListChecks, Menu, MessageCircle, Mic2, Plus, RefreshCw, Search, Settings2, Share2, Sparkles, WandSparkles } from "lucide-react";
 
 type Revision = { id: string; resourceId: string; title: string; content: string; status: "Draft" | "Needs review" | "Approved"; action: string; createdAt: string; actor: string };
@@ -8,7 +9,7 @@ type Resource = { id: string; title: string; type: string; content: string; stat
 type SavedSermon = { id: string; title: string; speaker: string; scripture: string; date: string; transcript: string; resources: Resource[]; revisions?: Record<string, Revision[]>; updatedAt: string };
 
 const RESOURCE_CHOICES = [
-  { id: "summary", label: "Sermon summary" }, { id: "outline", label: "Sermon outline" }, { id: "scriptures", label: "Scripture references" }, { id: "devotional", label: "Devotional" }, { id: "discussion", label: "Small-group guide" }, { id: "social", label: "Social captions" }, { id: "quotes", label: "Quote candidates" }, { id: "slides", label: "Slide outline" },
+  { id: "carousel", label: "Visual carousel deck" }, { id: "summary", label: "Sermon summary" }, { id: "outline", label: "Sermon outline" }, { id: "scriptures", label: "Scripture references" }, { id: "devotional", label: "Devotional" }, { id: "discussion", label: "Small-group guide" }, { id: "social", label: "Social captions" }, { id: "quotes", label: "Quote candidates" }, { id: "slides", label: "Slide outline" },
 ];
 const AUDIENCE_CHOICES = ["General congregation", "Youth and young adults", "Children and families", "Church leaders", "Small groups", "New believers", "Social media audience", "Bible study class"];
 const TONE_CHOICES = ["Pastoral and warm", "Teaching and explanatory", "Bold and exhortational", "Reflective and devotional", "Simple and accessible"];
@@ -16,6 +17,7 @@ const LANGUAGE_CHOICES = ["English", "Nigerian Pidgin", "Yoruba", "French", "Spa
 const PLATFORM_CHOICES = ["All platforms", "Instagram", "Facebook", "WhatsApp", "TikTok", "YouTube"];
 
 const starterResources: Resource[] = [
+  { id: "carousel", title: "Visual carousel deck", type: "Visual content", content: "Generate a sermon carousel to create editable slide cards and exportable images.", status: "Draft" },
   { id: "summary", title: "Sermon summary", type: "Summary", content: "Add a sermon transcript and generate a summary grounded in the actual message.", status: "Draft" },
   { id: "outline", title: "Sermon outline", type: "Outline", content: "A structured outline will appear here after generation.", status: "Draft" },
   { id: "scriptures", title: "Scripture references", type: "Scripture list", content: "Detected references will be listed with context and a verification reminder.", status: "Needs review" },
@@ -348,9 +350,11 @@ export default function Home() {
             </section>
           </div>
 
+          {activeId === "carousel" && <CarouselStudio content={active.content} title={sermonTitle} onChange={updateActive} />}
+
           <section className="panel editor-panel">
             <div className="editor-top"><div className="editor-title"><div className="heading-icon blue"><FileText size={18} /></div><div><h2>{active.title}</h2><p>{sermonTitle.trim() || "Untitled sermon"}{speaker.trim() ? " · " + speaker.trim() : ""}{date ? " · " + date : ""}</p></div></div><div className="editor-actions"><button className="secondary-button" onClick={copyDraft}><Clipboard size={15} /> Copy</button><button className="secondary-button" onClick={downloadDraft}><Download size={15} /> Export .txt</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Full pack</button><button className="secondary-button" onClick={regenerateActiveResource} disabled={generating || !transcript.trim()}><RefreshCw size={15} /> {generating ? "Working…" : "Regenerate this resource"}</button><button className="secondary-button" onClick={saveActiveRevision}><FileText size={15} /> Save version</button><button className="approve-button" onClick={markApproved}><Check size={16} /> Approve draft</button></div></div>
-            <div className="editor-label"><span>EDITABLE CONTENT</span><span className={`status status-${active.status.toLowerCase().replace(" ", "-")}`}>{active.status}</span></div>
+            <div className="editor-label"><span>{activeId === "carousel" ? "STRUCTURED SLIDE DATA · VISUAL EDITORS ABOVE" : "EDITABLE CONTENT"}</span><span className={`status status-${active.status.toLowerCase().replace(" ", "-")}`}>{active.status}</span></div>
             <textarea className="draft-editor" aria-label="Edit selected resource" value={active.content} onChange={(e) => updateActive(e.target.value)} />
             <div className="editor-footer"><span><span className="tiny-lock">✓</span> Changes are saved in this browser only.</span><button className="text-button" onClick={() => { recordRevision(active, "Saved before clearing draft"); setResources((old) => old.map((r) => r.id === activeId ? { ...r, content: "", status: "Draft", approvedAt: undefined, approvedBy: undefined } : r)); setNotice("Draft cleared. Its previous version was saved to history."); }}><Plus size={14} /> Clear draft</button></div>
             {active.status === "Approved" && active.approvedAt && <div className="approval-audit"><Check size={15} /><span><b>Approved locally</b><small>{active.approvedBy || "Local owner"} · {new Date(active.approvedAt).toLocaleString()}</small></span></div>}
