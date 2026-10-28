@@ -107,9 +107,9 @@ export default function Home() {
   }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const filtered = useMemo(() => resources.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()) || r.type.toLowerCase().includes(query.toLowerCase())), [resources, query]);
 
-  async function prepareDrafts() {
+  async function prepareDrafts(resourceIds: string[] = selectedResourceIds) {
     const raw = transcript.trim();
-    if (selectedResourceIds.length === 0) { setNotice("Select at least one resource to generate."); return; }
+    if (resourceIds.length === 0) { setNotice("Select at least one resource to generate."); return; }
     if (!sermonTitle.trim()) { setNotice("Enter a sermon title before generating resources."); return; }
     if (!raw) { setNotice("Paste the sermon transcript before generating resources."); return; }
     if (raw.length > 16000) { setNotice("This free-tier generation workflow supports up to 16,000 transcript characters per request. Split a longer sermon into sections."); return; }
@@ -120,21 +120,21 @@ export default function Home() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: sermonTitle.trim(), speaker: speaker.trim(), scripture: scripture.trim(), date, transcript: raw, resourceIds: selectedResourceIds, options: { audience, tone, language: outputLanguage, platforms: socialPlatforms } }),
+        body: JSON.stringify({ title: sermonTitle.trim(), speaker: speaker.trim(), scripture: scripture.trim(), date, transcript: raw, resourceIds, options: { audience, tone, language: outputLanguage, platforms: socialPlatforms } }),
       });
       const result = await response.json();
       if (!response.ok) {
         setNotice(result?.error?.message || "Generation failed. Your transcript is still available; please try again.");
         return;
       }
-      if (!Array.isArray(result.resources) || result.resources.length !== selectedResourceIds.length || !selectedResourceIds.every((id) => result.resources.some((item: Resource) => item.id === id))) {
+      if (!Array.isArray(result.resources) || result.resources.length !== resourceIds.length || !resourceIds.every((id) => result.resources.some((item: Resource) => item.id === id))) {
         setNotice("The server returned an incomplete selected resource set. Your existing drafts were not overwritten.");
         return;
       }
       const generated = result.resources as Resource[];
-      setResources((old) => [...old.filter((item) => !selectedResourceIds.includes(item.id)), ...generated].sort((a, b) => RESOURCE_CHOICES.findIndex((choice) => choice.id === a.id) - RESOURCE_CHOICES.findIndex((choice) => choice.id === b.id)));
+      setResources((old) => [...old.filter((item) => !resourceIds.includes(item.id)), ...generated].sort((a, b) => RESOURCE_CHOICES.findIndex((choice) => choice.id === a.id) - RESOURCE_CHOICES.findIndex((choice) => choice.id === b.id)));
       setActiveId(generated[0]?.id || "summary");
-      setNotice("Generated " + generated.length + " selected resource draft(s) using your audience, tone and language settings. Review each against the sermon before sharing.");
+      setNotice("Generated " + generated.length + " resource draft(s). Review the content against the original sermon before sharing.");
     } catch {
       setNotice("Could not reach the generation endpoint. Your transcript is still in the editor; check your connection and try again.");
     } finally {
@@ -332,11 +332,7 @@ export default function Home() {
         <div className="page-content">
           <div className="welcome-row"><div><div className="eyebrow"><Sparkles size={14} /> YOUR SERMON, MULTIPLIED WITH CARE</div><h1>Make more of every message.</h1><p className="intro">Turn your sermon into useful church resources while keeping the original message at the centre.</p><button className="visual-studio-cta" onClick={() => setActiveId("carousel")}><WandSparkles size={17} /> Open Visual Carousel Studio <span>→</span></button></div><div className="welcome-icon"><Mic2 size={28} /></div></div>
 
-          <section className="panel library-panel" id="sermon-library">
-            <div className="panel-heading"><div className="heading-icon green"><BookOpen size={18} /></div><div><h2>Sermon library</h2><p>Save, reopen, search and export sermons on this device.</p></div><span className="count-pill">{library.length} saved</span></div>
-            <div className="library-actions"><div className="search-box"><Search size={16} /><input value={libraryQuery} onChange={(e) => setLibraryQuery(e.target.value)} placeholder="Search sermons, transcripts, resources" /></div><button className="secondary-button" onClick={startNewSermon}><Plus size={15} /> New sermon</button><button className="secondary-button" onClick={saveToLibrary}><Check size={15} /> {selectedSermonId ? "Update saved sermon" : "Save sermon"}</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Export full pack</button><button className="secondary-button" onClick={exportBackup}><Download size={15} /> Backup all</button><button className="secondary-button" onClick={() => document.getElementById("backup-import")?.click()}>Import backup</button><input id="backup-import" type="file" accept=".json,application/json" hidden onChange={(e) => { void importBackup(e.target.files?.[0]); e.currentTarget.value = ""; }} /></div>
-            {filteredLibrary.length ? <div className="library-list">{filteredLibrary.map((item) => <div className="library-item" key={item.id}><button className="library-open" onClick={() => openSavedSermon(item)}><b>{item.title || "Untitled sermon"}</b><small>{item.speaker || "Speaker not set"} · {item.date || "Date not set"} · {item.resources.length} resources</small><small>Last saved: {new Date(item.updatedAt).toLocaleString()}</small></button><button className="text-button" onClick={() => deleteSavedSermon(item.id)} aria-label={"Delete " + item.title}>Delete</button></div>)}</div> : <p className="library-empty">{libraryQuery ? "No saved sermons match that search." : "Your archive is empty. Add sermon details and a transcript, then choose Save sermon. Your library stays in this browser and does not sync across devices."}</p>}
-          </section>
+
 
           <div className="workflow"><div className="workflow-step current"><span>1</span><div><b>Add sermon</b><small>Transcript &amp; details</small></div></div><div className="workflow-line" /><div className="workflow-step"><span>2</span><div><b>Prepare drafts</b><small>Build your resource set</small></div></div><div className="workflow-line" /><div className="workflow-step"><span>3</span><div><b>Review &amp; share</b><small>You stay in control</small></div></div></div>
 
@@ -346,6 +342,7 @@ export default function Home() {
               <div className="form-grid"><label className="field full"><span>Sermon title</span><input value={sermonTitle} onChange={(e) => setSermonTitle(e.target.value)} placeholder="e.g. Faith That Moves Forward" required /></label><label className="field"><span>Speaker</span><input value={speaker} onChange={(e) => setSpeaker(e.target.value)} placeholder="Pastor / speaker" /></label><label className="field"><span>Date preached</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label className="field full"><span>Key Scripture references</span><input value={scripture} onChange={(e) => setScripture(e.target.value)} placeholder="e.g. Hebrews 11:1–6" /></label></div>
               <div className="transcript-head"><label htmlFor="transcript">Sermon transcript <span className="required">Required</span></label><div className="transcript-tools"><span>{transcript.length.toLocaleString()} characters</span><button className="text-button" onClick={() => document.getElementById("media-file")?.click()} disabled={transcribing}>{transcribing ? "Transcribing…" : "Upload audio/video"}</button><input id="media-file" type="file" accept="audio/*,video/mp4,video/webm,.mp4,.webm,.m4a,.mp3,.wav,.ogg,.flac" hidden onChange={(e) => { void transcribeMedia(e.target.files?.[0]); e.currentTarget.value = ""; }} /><button className="text-button" onClick={() => document.getElementById("transcript-file")?.click()}>Import .txt</button><input id="transcript-file" type="file" accept=".txt,text/plain" hidden onChange={(e) => { void importTranscriptText(e.target.files?.[0]); e.currentTarget.value = ""; }} /></div></div>
               <textarea id="transcript" value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Paste the sermon transcript here…&#10;&#10;For best results, include the full message and any Scripture references as preached." maxLength={16000} />
+              <div className="visual-generate-row"><button className="visual-generate-button" onClick={() => { setSelectedResourceIds(["carousel"]); void prepareDrafts(["carousel"]); }} disabled={generating || transcribing}><WandSparkles size={19} /> {generating ? "Generating your carousel…" : "Generate Visual Carousel"} <span>→</span></button><p>Turn this sermon into editable, export-ready social slides.</p></div>
               <div className="transcript-foot"><span><span className="tiny-lock">✓</span> Your transcript is saved in this browser only.</span><span>Paste text or transcribe media · Up to 16,000 characters</span></div>
               <section className="generation-controls">
                 <div className="generation-controls-heading"><div><b>Build your content pack</b><small>Choose exactly what the AI should create.</small></div><button type="button" className="text-button" onClick={() => setSelectedResourceIds(RESOURCE_CHOICES.map((item) => item.id))}>Select all</button></div>
@@ -378,6 +375,12 @@ export default function Home() {
             <div className="editor-footer"><span><span className="tiny-lock">✓</span> Changes are saved in this browser only.</span><button className="text-button" onClick={() => { recordRevision(active, "Saved before clearing draft"); setResources((old) => old.map((r) => r.id === activeId ? { ...r, content: "", status: "Draft", approvedAt: undefined, approvedBy: undefined } : r)); setNotice("Draft cleared. Its previous version was saved to history."); }}><Plus size={14} /> Clear draft</button></div>
             {active.status === "Approved" && active.approvedAt && <div className="approval-audit"><Check size={15} /><span><b>Approved locally</b><small>{active.approvedBy || "Local owner"} · {new Date(active.approvedAt).toLocaleString()}</small></span></div>}
             <section className="revision-panel"><div className="revision-heading"><div><h3>Revision history</h3><p>Up to 20 saved versions for this resource on this device.</p></div><span className="count-pill">{activeRevisions.length} versions</span></div>{activeRevisions.length ? <div className="revision-list">{activeRevisions.map((revision) => <div className="revision-item" key={revision.id}><div className="revision-copy"><b>{revision.action}</b><small>{new Date(revision.createdAt).toLocaleString()} · {revision.actor} · {revision.status}</small><p>{revision.content.slice(0, 150) || "Empty draft"}{revision.content.length > 150 ? "…" : ""}</p></div><button className="secondary-button" onClick={() => restoreRevision(revision)}>Restore</button></div>)}</div> : <p className="library-empty">No versions saved yet. Choose “Save version” before major edits, or regenerate/approve to create a history entry.</p>}</section>
+          </section>
+
+          <section className="panel library-panel" id="sermon-library">
+            <div className="panel-heading"><div className="heading-icon green"><BookOpen size={18} /></div><div><h2>Sermon library</h2><p>Save, reopen, search and export sermons on this device.</p></div><span className="count-pill">{library.length} saved</span></div>
+            <div className="library-actions"><div className="search-box"><Search size={16} /><input value={libraryQuery} onChange={(e) => setLibraryQuery(e.target.value)} placeholder="Search sermons, transcripts, resources" /></div><button className="secondary-button" onClick={startNewSermon}><Plus size={15} /> New sermon</button><button className="secondary-button" onClick={saveToLibrary}><Check size={15} /> {selectedSermonId ? "Update saved sermon" : "Save sermon"}</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Export full pack</button><button className="secondary-button" onClick={exportBackup}><Download size={15} /> Backup all</button><button className="secondary-button" onClick={() => document.getElementById("backup-import")?.click()}>Import backup</button><input id="backup-import" type="file" accept=".json,application/json" hidden onChange={(e) => { void importBackup(e.target.files?.[0]); e.currentTarget.value = ""; }} /></div>
+            {filteredLibrary.length ? <div className="library-list">{filteredLibrary.map((item) => <div className="library-item" key={item.id}><button className="library-open" onClick={() => openSavedSermon(item)}><b>{item.title || "Untitled sermon"}</b><small>{item.speaker || "Speaker not set"} · {item.date || "Date not set"} · {item.resources.length} resources</small><small>Last saved: {new Date(item.updatedAt).toLocaleString()}</small></button><button className="text-button" onClick={() => deleteSavedSermon(item.id)} aria-label={"Delete " + item.title}>Delete</button></div>)}</div> : <p className="library-empty">{libraryQuery ? "No saved sermons match that search." : "Your archive is empty. Add sermon details and a transcript, then choose Save sermon. Your library stays in this browser and does not sync across devices."}</p>}
           </section>
 
           <div className="bottom-note"><div className="bottom-note-icon"><HeartHandshake size={19} /></div><div><b>Built to serve the local church.</b><p>Kingdom Sermon Intelligence assists ministry work; it does not replace the preacher’s voice, biblical study, pastoral discernment, or human review.</p></div><div className="bottom-note-mark"><BookOpen size={23} /></div></div>
