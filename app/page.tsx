@@ -5,7 +5,7 @@ import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHands
 
 type Revision = { id: string; resourceId: string; title: string; content: string; status: "Draft" | "Needs review" | "Approved"; action: string; createdAt: string; actor: string };
 type Resource = { id: string; title: string; type: string; content: string; status: "Draft" | "Needs review" | "Approved"; approvedAt?: string; approvedBy?: string };
-type SavedSermon = { id: string; title: string; speaker: string; scripture: string; date: string; transcript: string; resources: Resource[]; updatedAt: string };
+type SavedSermon = { id: string; title: string; speaker: string; scripture: string; date: string; transcript: string; resources: Resource[]; revisions?: Record<string, Revision[]>; updatedAt: string };
 
 const starterResources: Resource[] = [
   { id: "summary", title: "Sermon summary", type: "Summary", content: "Add a sermon transcript and generate a summary grounded in the actual message.", status: "Draft" },
@@ -150,7 +150,7 @@ export default function Home() {
 
   function saveToLibrary() {
     const title = sermonTitle.trim() || "Untitled sermon";
-    const record: SavedSermon = { id: selectedSermonId || String(Date.now()), title, speaker, scripture, date, transcript, resources: resources.map((item) => ({ ...item })), updatedAt: new Date().toISOString() };
+    const record: SavedSermon = { id: selectedSermonId || String(Date.now()), title, speaker, scripture, date, transcript, resources: resources.map((item) => ({ ...item })), revisions: JSON.parse(JSON.stringify(revisions)) as Record<string, Revision[]>, updatedAt: new Date().toISOString() };
     setLibrary((old) => selectedSermonId ? old.map((item) => item.id === selectedSermonId ? record : item) : [record, ...old]);
     setSelectedSermonId(record.id);
     setNotice(selectedSermonId ? "Sermon changes saved to your local library." : "Sermon saved to your local library on this device.");
@@ -158,13 +158,13 @@ export default function Home() {
 
   function openSavedSermon(record: SavedSermon) {
     setSermonTitle(record.title); setSpeaker(record.speaker || ""); setScripture(record.scripture || ""); setDate(record.date || ""); setTranscript(record.transcript || "");
-    setResources(record.resources.map((item) => ({ ...item }))); setActiveId(record.resources[0]?.id || "summary"); setSelectedSermonId(record.id);
+    setResources(record.resources.map((item) => ({ ...item }))); setRevisions(record.revisions || {}); setActiveId(record.resources[0]?.id || "summary"); setSelectedSermonId(record.id);
     setNotice("Opened sermon from this browser's local library.");
   }
 
   function startNewSermon() {
     setSermonTitle(""); setSpeaker(""); setScripture(""); setDate(""); setTranscript(""); setResources(starterResources.map((item) => ({ ...item })));
-    setActiveId("summary"); setSelectedSermonId(""); setNotice("Started a new sermon. Save it to add it to your library.");
+    setActiveId("summary"); setSelectedSermonId(""); setRevisions({}); setNotice("Started a new sermon. Save it to add it to your library.");
   }
 
   function deleteSavedSermon(id: string) {
