@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHandshake, Lightbulb, ListChecks, Menu, MessageCircle, Mic2, Plus, Search, Settings2, Share2, Sparkles, WandSparkles } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHandshake, Lightbulb, ListChecks, Menu, MessageCircle, Mic2, Plus, RefreshCw, Search, Settings2, Share2, Sparkles, WandSparkles } from "lucide-react";
 
 type Resource = { id: string; title: string; type: string; content: string; status: "Draft" | "Needs review" | "Approved" };
 type SavedSermon = { id: string; title: string; speaker: string; scripture: string; date: string; transcript: string; resources: Resource[]; updatedAt: string };
@@ -89,6 +89,39 @@ export default function Home() {
       setNotice("AI generated all eight resource drafts. Review each against the sermon before approving or sharing. Nothing has been published.");
     } catch {
       setNotice("Could not reach the generation endpoint. Your transcript is still in the editor; check your connection and try again.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function regenerateActiveResource() {
+    const raw = transcript.trim();
+    if (!sermonTitle.trim()) { setNotice("Enter a sermon title before regenerating a resource."); return; }
+    if (!raw) { setNotice("Paste the sermon transcript before regenerating a resource."); return; }
+    if (raw.length > 16000) { setNotice("This free-tier workflow supports up to 16,000 transcript characters per request."); return; }
+
+    setGenerating(true);
+    setNotice("Regenerating only the selected resource. Your current version will remain until a valid replacement arrives.");
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: sermonTitle.trim(), speaker: speaker.trim(), scripture: scripture.trim(), date, transcript: raw, resourceIds: [activeId] }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setNotice(result?.error?.message || "Resource regeneration failed. Your current draft has been kept.");
+        return;
+      }
+      if (!Array.isArray(result.resources) || result.resources.length !== 1 || result.resources[0]?.id !== activeId) {
+        setNotice("The server returned an unexpected resource. Your current draft has been kept.");
+        return;
+      }
+      const replacement = result.resources[0] as Resource;
+      setResources((old) => old.map((item) => item.id === activeId ? { ...replacement, status: "Needs review" } : item));
+      setNotice("Selected resource regenerated. Review it against the sermon; your other resources were not changed.");
+    } catch {
+      setNotice("Could not reach the generation endpoint. Your current draft has been kept.");
     } finally {
       setGenerating(false);
     }
@@ -204,7 +237,7 @@ export default function Home() {
           </div>
 
           <section className="panel editor-panel">
-            <div className="editor-top"><div className="editor-title"><div className="heading-icon blue"><FileText size={18} /></div><div><h2>{active.title}</h2><p>{sermonTitle.trim() || "Untitled sermon"}{speaker.trim() ? " · " + speaker.trim() : ""}{date ? " · " + date : ""}</p></div></div><div className="editor-actions"><button className="secondary-button" onClick={copyDraft}><Clipboard size={15} /> Copy</button><button className="secondary-button" onClick={downloadDraft}><Download size={15} /> Export .txt</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Full pack</button><button className="approve-button" onClick={markApproved}><Check size={16} /> Approve draft</button></div></div>
+            <div className="editor-top"><div className="editor-title"><div className="heading-icon blue"><FileText size={18} /></div><div><h2>{active.title}</h2><p>{sermonTitle.trim() || "Untitled sermon"}{speaker.trim() ? " · " + speaker.trim() : ""}{date ? " · " + date : ""}</p></div></div><div className="editor-actions"><button className="secondary-button" onClick={copyDraft}><Clipboard size={15} /> Copy</button><button className="secondary-button" onClick={downloadDraft}><Download size={15} /> Export .txt</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Full pack</button><button className="secondary-button" onClick={regenerateActiveResource} disabled={generating || !transcript.trim()}><RefreshCw size={15} /> {generating ? "Working…" : "Regenerate this resource"}</button><button className="approve-button" onClick={markApproved}><Check size={16} /> Approve draft</button></div></div>
             <div className="editor-label"><span>EDITABLE CONTENT</span><span className={`status status-${active.status.toLowerCase().replace(" ", "-")}`}>{active.status}</span></div>
             <textarea className="draft-editor" aria-label="Edit selected resource" value={active.content} onChange={(e) => updateActive(e.target.value)} />
             <div className="editor-footer"><span><span className="tiny-lock">✓</span> Changes are saved in this browser only.</span><button className="text-button" onClick={() => { setResources((old) => old.map((r) => r.id === activeId ? { ...r, content: "" , status: "Draft" } : r)); setNotice("Draft cleared."); }}><Plus size={14} /> Clear draft</button></div>
