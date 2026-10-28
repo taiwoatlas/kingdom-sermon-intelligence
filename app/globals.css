@@ -112,3 +112,28 @@
 .visual-page .carousel-art-error{margin:0;color:#b42318;font-size:12px;line-height:1.45}
 .visual-page .spin{animation:carousel-spin 1s linear infinite}
 @keyframes carousel-spin{to{transform:rotate(360deg)}}
+
+/* Editorial template families: each slide gets a deliberate composition, not just a new colour. */
+.visual-page .carousel-artboard.art-layout-0 .carousel-artboard-rule{width:68px;height:5px;margin:7% 0 10%}
+.visual-page .art-layout-0 .carousel-artboard p{max-width:92%;border-left:3px solid var(--art-accent);padding-left:14px}
+.visual-page .carousel-artboard.art-layout-1 .carousel-artboard-kicker{letter-spacing:2.6px}
+.visual-page .carousel-artboard.art-layout-1 .carousel-artboard-rule{margin:7% 0 15%;width:42px}
+.visual-page .art-layout-1 .carousel-artboard p{max-width:78%;margin-left:auto;font-family:Georgia,serif;font-size:clamp(15px,1.4vw,19px)}
+.visual-page .carousel-artboard.art-layout-1:before{content:"";position:absolute;left:8%;top:24%;height:38%;width:1px;background:var(--art-accent);opacity:.7;z-index:1}
+.visual-page .carousel-artboard.art-layout-2 .carousel-artboard-kicker{text-align:center}
+.visual-page .carousel-artboard.art-layout-2 .carousel-artboard-rule{margin:10% auto 12%;width:58px}
+.visual-page .art-layout-2 .carousel-artboard h3{text-align:center}
+.visual-page .art-layout-2 .carousel-artboard p{text-align:center;max-width:88%;margin:0 auto}
+.visual-page .carousel-artboard.art-layout-2 .carousel-artboard-footer{text-align:center}
+.visual-page .carousel-artboard.art-layout-3 .carousel-artboard-rule{width:76px;height:2px;margin:5% 0 8%}
+.visual-page .art-layout-3 .carousel-artboard p{font-family:Georgia,serif;font-size:clamp(16px,1.45vw,20px);line-height:1.6;max-width:94%}
+.visual-page .carousel-artboard.art-layout-3 .carousel-artboard-footer{border-top:1px solid var(--art-accent);padding-top:5%}
+.visual-page .carousel-artboard.art-layout-4 .carousel-artboard-kicker{display:inline-block;align-self:flex-start;padding:6px 8px;border:1px solid var(--art-accent);border-radius:2px}
+.visual-page .carousel-artboard.art-layout-4 .carousel-artboard-rule{margin:8% 0 11%;width:22px;height:7px}
+.visual-page .art-layout-4 .carousel-artboard p{max-width:84%;margin-left:8%;line-height:1.48}
+@media(max-width:600px){
+ .visual-page .art-layout-1 .carousel-artboard p{font-size:clamp(15px,3.5vw,18px);max-width:88%}
+ .visual-page .art-layout-2 .carousel-artboard p{max-width:94%}
+ .visual-page .art-layout-3 .carousel-artboard p{font-size:clamp(15px,3.5vw,18px)}
+ .visual-page .art-layout-4 .carousel-artboard p{max-width:90%;margin-left:4%}
+}
