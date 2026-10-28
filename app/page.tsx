@@ -43,7 +43,8 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [generating, setGenerating] = useState(false);\n  const [transcribing, setTranscribing] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>(RESOURCE_CHOICES.map((item) => item.id));
   const [audience, setAudience] = useState("General congregation");
   const [tone, setTone] = useState("Pastoral and warm");
@@ -192,7 +193,24 @@ export default function Home() {
     }
   }
 
-  async function transcribeMedia(file?: File) {\n    if (!file) return;\n    setTranscribing(true);\n    setNotice("Uploading the media to the free-tier transcription endpoint. Large files may take a little time.");\n    try {\n      const form = new FormData(); form.append("file", file);\n      const response = await fetch("/api/transcribe", { method: "POST", body: form });\n      const result = await response.json();\n      if (!response.ok) { setNotice(result?.error?.message || "Transcription failed. Your existing transcript was kept."); return; }\n      if (typeof result.transcript !== "string" || !result.transcript.trim()) { setNotice("No transcript was returned. Your existing transcript was kept."); return; }\n      if (result.transcript.length > 16000) { setNotice("Transcription completed, but the result is " + result.transcript.length.toLocaleString() + " characters. The current generator accepts 16,000 characters; split the sermon transcript into sections before generating."); setTranscript(result.transcript.slice(0, 16000)); }\n      else { setTranscript(result.transcript); setNotice("Transcription completed from " + file.name + ". Review names and Scripture references before generating content."); }\n      if (!sermonTitle.trim()) setSermonTitle(file.name.replace(/\\.[^.]+$/, "").replace(/[_-]+/g, " "));\n    } catch { setNotice("Could not reach the transcription endpoint. Your existing transcript was kept."); }\n    finally { setTranscribing(false); }\n  }\n\n  function exportBackup() {
+  async function transcribeMedia(file?: File) {
+    if (!file) return;
+    setTranscribing(true);
+    setNotice("Uploading the media to the free-tier transcription endpoint. Large files may take a little time.");
+    try {
+      const form = new FormData(); form.append("file", file);
+      const response = await fetch("/api/transcribe", { method: "POST", body: form });
+      const result = await response.json();
+      if (!response.ok) { setNotice(result?.error?.message || "Transcription failed. Your existing transcript was kept."); return; }
+      if (typeof result.transcript !== "string" || !result.transcript.trim()) { setNotice("No transcript was returned. Your existing transcript was kept."); return; }
+      if (result.transcript.length > 16000) { setNotice("Transcription completed, but the result is " + result.transcript.length.toLocaleString() + " characters. The current generator accepts 16,000 characters; split the sermon transcript into sections before generating."); setTranscript(result.transcript.slice(0, 16000)); }
+      else { setTranscript(result.transcript); setNotice("Transcription completed from " + file.name + ". Review names and Scripture references before generating content."); }
+      if (!sermonTitle.trim()) setSermonTitle(file.name.replace(/\\.[^.]+$/, "").replace(/[_-]+/g, " "));
+    } catch { setNotice("Could not reach the transcription endpoint. Your existing transcript was kept."); }
+    finally { setTranscribing(false); }
+  }
+
+  function exportBackup() {
     const backup = { app: "Kingdom Sermon Intelligence", schemaVersion: 1, exportedAt: new Date().toISOString(), current: { sermonTitle, speaker, scripture, date, transcript, resources, revisions }, library };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
     const url = URL.createObjectURL(blob);
