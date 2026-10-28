@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHandshake, Lightbulb, ListChecks, Menu, MessageCircle, Mic2, Plus, Search, Settings2, Share2, Sparkles, WandSparkles } from "lucide-react";
 
 type Resource = { id: string; title: string; type: string; content: string; status: "Draft" | "Needs review" | "Approved" };
+type SavedSermon = { id: string; title: string; speaker: string; scripture: string; date: string; transcript: string; resources: Resource[]; updatedAt: string };
 
 const starterResources: Resource[] = [
   { id: "summary", title: "Sermon summary", type: "Summary", content: "Add a sermon transcript, then use the workspace to prepare a concise summary that preserves the preacher’s central message and supporting points.", status: "Draft" },
@@ -22,6 +23,9 @@ export default function Home() {
   const [transcript, setTranscript] = useState("");
   const [activeId, setActiveId] = useState("summary");
   const [resources, setResources] = useState<Resource[]>(starterResources);
+  const [library, setLibrary] = useState<SavedSermon[]>([]);
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const [selectedSermonId, setSelectedSermonId] = useState("");
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -40,6 +44,7 @@ export default function Home() {
         if (Array.isArray(data.resources) && data.resources.every((r: Resource) => typeof r.id === "string" && typeof r.content === "string")) setResources(data.resources);
       }
     } catch { /* Ignore malformed local data. */ }
+    try { const savedLibrary = localStorage.getItem("kingdom-sermon-library-v1"); if (savedLibrary) { const parsed = JSON.parse(savedLibrary); if (Array.isArray(parsed)) setLibrary(parsed.filter((item: SavedSermon) => item && typeof item.id === "string" && Array.isArray(item.resources))); } } catch { /* Ignore malformed archive data. */ }
     setHydrated(true);
   }, []);
   useEffect(() => {
@@ -48,7 +53,10 @@ export default function Home() {
     catch { setNotice("Your browser could not save more local data. Export important drafts as text files."); }
   }, [hydrated, sermonTitle, speaker, scripture, date, transcript, resources]);
 
+  useEffect(() => { if (!hydrated) return; try { localStorage.setItem("kingdom-sermon-library-v1", JSON.stringify(library)); } catch { setNotice("The browser could not save the full library. Export your sermon pack for safekeeping."); } }, [hydrated, library]);
+
   const active = resources.find((r) => r.id === activeId) ?? resources[0];
+  const filteredLibrary = library.filter((item) => [item.title, item.speaker, item.scripture].some((value) => (value || "").toLowerCase().includes(libraryQuery.toLowerCase()))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const filtered = useMemo(() => resources.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()) || r.type.toLowerCase().includes(query.toLowerCase())), [resources, query]);
 
   function prepareDrafts() {
@@ -80,6 +88,39 @@ export default function Home() {
     setActiveId("summary");
     setGenerating(false);
     setNotice("Six working drafts prepared offline. No AI service or paid API was used; edit each draft against the sermon before sharing.");
+  }
+
+  function saveToLibrary() {
+    const title = sermonTitle.trim() || "Untitled sermon";
+    const record: SavedSermon = { id: selectedSermonId || String(Date.now()), title, speaker, scripture, date, transcript, resources: resources.map((item) => ({ ...item })), updatedAt: new Date().toISOString() };
+    setLibrary((old) => selectedSermonId ? old.map((item) => item.id === selectedSermonId ? record : item) : [record, ...old]);
+    setSelectedSermonId(record.id);
+    setNotice(selectedSermonId ? "Sermon changes saved to your local library." : "Sermon saved to your local library on this device.");
+  }
+
+  function openSavedSermon(record: SavedSermon) {
+    setSermonTitle(record.title); setSpeaker(record.speaker || ""); setScripture(record.scripture || ""); setDate(record.date || ""); setTranscript(record.transcript || "");
+    setResources(record.resources.map((item) => ({ ...item }))); setActiveId(record.resources[0]?.id || "summary"); setSelectedSermonId(record.id);
+    setNotice("Opened sermon from this browser's local library.");
+  }
+
+  function startNewSermon() {
+    setSermonTitle(""); setSpeaker(""); setScripture(""); setDate(""); setTranscript(""); setResources(starterResources.map((item) => ({ ...item })));
+    setActiveId("summary"); setSelectedSermonId(""); setNotice("Started a new sermon. Save it to add it to your library.");
+  }
+
+  function deleteSavedSermon(id: string) {
+    if (!window.confirm("Delete this saved sermon and its resource drafts from this browser? This cannot be undone.")) return;
+    setLibrary((old) => old.filter((item) => item.id !== id));
+    if (selectedSermonId === id) setSelectedSermonId("");
+    setNotice("Saved sermon deleted from this browser.");
+  }
+
+  function exportResourcePack() {
+    const pack = ["KINGDOM SERMON INTELLIGENCE — RESOURCE PACK", "SERMON: " + (sermonTitle.trim() || "Untitled sermon"), "SPEAKER: " + speaker, "DATE: " + date, "SCRIPTURES: " + scripture, "", ...resources.flatMap((item) => ["=".repeat(56), item.title.toUpperCase() + " — " + item.status, "=".repeat(56), item.content, ""])].join("\n");
+    const blob = new Blob([pack], { type: "text/plain;charset=utf-8" }); const url = URL.createObjectURL(blob);
+    const link = document.createElement("a"); link.href = url; link.download = (sermonTitle.trim() || "sermon-resource-pack").toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-resource-pack.txt";
+    link.click(); URL.revokeObjectURL(url); setNotice("Complete resource pack exported as a text file.");
   }
 
   function updateActive(content: string) {
@@ -118,7 +159,7 @@ export default function Home() {
         <button className="workspace-select"><span className="workspace-avatar">K</span><span className="workspace-copy"><b>Church workspace</b><small>Personal workspace</small></span><ChevronDown size={16} /></button>
         <div className="nav-label">WORKSPACE</div>
         <button className="nav-item active"><FileText size={18} /> Sermon studio</button>
-        <button className="nav-item" onClick={() => setNotice("Archive is planned for a later version. Your current drafts stay in this browser session.")}><BookOpen size={18} /> Sermon library <span className="soon">SOON</span></button>
+        <button className="nav-item" onClick={() => document.getElementById("sermon-library")?.scrollIntoView({ behavior: "smooth" })}><BookOpen size={18} /> Sermon library <span className="soon">{library.length}</span></button>
         <button className="nav-item" onClick={() => setNotice("Team collaboration is planned for a later version.")}><HeartHandshake size={18} /> Team &amp; ministry <span className="soon">SOON</span></button>
         <div className="nav-label nav-label-spaced">YOUR RESOURCES</div>
         {resources.slice(0, 4).map((r) => <button key={r.id} className={`nav-item ${activeId === r.id ? "sub-active" : ""}`} onClick={() => setActiveId(r.id)}><span className="nav-dot" />{r.title}</button>)}
@@ -130,6 +171,12 @@ export default function Home() {
 
         <div className="page-content">
           <div className="welcome-row"><div><div className="eyebrow"><Sparkles size={14} /> YOUR SERMON, MULTIPLIED WITH CARE</div><h1>Make more of every message.</h1><p className="intro">Turn your sermon into useful church resources while keeping the original message at the centre.</p></div><div className="welcome-icon"><Mic2 size={28} /></div></div>
+
+          <section className="panel library-panel" id="sermon-library">
+            <div className="panel-heading"><div className="heading-icon green"><BookOpen size={18} /></div><div><h2>Sermon library</h2><p>Save, reopen, search and export sermons on this device.</p></div><span className="count-pill">{library.length} saved</span></div>
+            <div className="library-actions"><div className="search-box"><Search size={16} /><input value={libraryQuery} onChange={(e) => setLibraryQuery(e.target.value)} placeholder="Search saved sermons" /></div><button className="secondary-button" onClick={startNewSermon}><Plus size={15} /> New sermon</button><button className="secondary-button" onClick={saveToLibrary}><Check size={15} /> {selectedSermonId ? "Update saved sermon" : "Save sermon"}</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Export full pack</button></div>
+            {filteredLibrary.length ? <div className="library-list">{filteredLibrary.map((item) => <div className="library-item" key={item.id}><button className="library-open" onClick={() => openSavedSermon(item)}><b>{item.title || "Untitled sermon"}</b><small>{item.speaker || "Speaker not set"} · {item.date || "Date not set"} · {item.resources.length} resources</small><small>Last saved: {new Date(item.updatedAt).toLocaleString()}</small></button><button className="text-button" onClick={() => deleteSavedSermon(item.id)} aria-label={"Delete " + item.title}>Delete</button></div>)}</div> : <p className="library-empty">{libraryQuery ? "No saved sermons match that search." : "Your archive is empty. Add sermon details and a transcript, then choose Save sermon. Your library stays in this browser and does not sync across devices."}</p>}
+          </section>
 
           <div className="workflow"><div className="workflow-step current"><span>1</span><div><b>Add sermon</b><small>Transcript &amp; details</small></div></div><div className="workflow-line" /><div className="workflow-step"><span>2</span><div><b>Prepare drafts</b><small>Build your resource set</small></div></div><div className="workflow-line" /><div className="workflow-step"><span>3</span><div><b>Review &amp; share</b><small>You stay in control</small></div></div></div>
 
@@ -153,7 +200,7 @@ export default function Home() {
           </div>
 
           <section className="panel editor-panel">
-            <div className="editor-top"><div className="editor-title"><div className="heading-icon blue"><FileText size={18} /></div><div><h2>{active.title}</h2><p>{sermonTitle.trim() || "Untitled sermon"}{speaker.trim() ? " · " + speaker.trim() : ""}{date ? " · " + date : ""}</p></div></div><div className="editor-actions"><button className="secondary-button" onClick={copyDraft}><Clipboard size={15} /> Copy</button><button className="secondary-button" onClick={downloadDraft}><Download size={15} /> Export .txt</button><button className="approve-button" onClick={markApproved}><Check size={16} /> Approve draft</button></div></div>
+            <div className="editor-top"><div className="editor-title"><div className="heading-icon blue"><FileText size={18} /></div><div><h2>{active.title}</h2><p>{sermonTitle.trim() || "Untitled sermon"}{speaker.trim() ? " · " + speaker.trim() : ""}{date ? " · " + date : ""}</p></div></div><div className="editor-actions"><button className="secondary-button" onClick={copyDraft}><Clipboard size={15} /> Copy</button><button className="secondary-button" onClick={downloadDraft}><Download size={15} /> Export .txt</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Full pack</button><button className="approve-button" onClick={markApproved}><Check size={16} /> Approve draft</button></div></div>
             <div className="editor-label"><span>EDITABLE CONTENT</span><span className={`status status-${active.status.toLowerCase().replace(" ", "-")}`}>{active.status}</span></div>
             <textarea className="draft-editor" aria-label="Edit selected resource" value={active.content} onChange={(e) => updateActive(e.target.value)} />
             <div className="editor-footer"><span><span className="tiny-lock">✓</span> Changes are saved in this browser only.</span><button className="text-button" onClick={() => { setResources((old) => old.map((r) => r.id === activeId ? { ...r, content: "" , status: "Draft" } : r)); setNotice("Draft cleared."); }}><Plus size={14} /> Clear draft</button></div>
