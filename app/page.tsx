@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import CarouselStudio from "./components/CarouselStudio";
 import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHandshake, Image as ImageIcon, Lightbulb, ListChecks, Menu, MessageCircle, Mic2, Plus, RefreshCw, Search, Settings2, Share2, Sparkles, WandSparkles } from "lucide-react";
