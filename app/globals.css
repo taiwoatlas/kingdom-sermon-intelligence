@@ -103,7 +103,7 @@
 /* Optional AI-generated slide artwork */
 .visual-page .carousel-artboard{position:relative;overflow:hidden}
 .visual-page .carousel-ai-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
-.visual-page .carousel-ai-art-overlay{position:absolute;inset:0;opacity:.42;z-index:0;pointer-events:none}
+.visual-page .carousel-ai-art-overlay{position:absolute;inset:0;opacity:.3;z-index:0;pointer-events:none}
 .visual-page .carousel-artboard-kicker,.visual-page .carousel-artboard-rule,.visual-page .carousel-artboard h3,.visual-page .carousel-artboard p,.visual-page .carousel-artboard strong,.visual-page .carousel-artboard-footer{z-index:1}
 .visual-page .carousel-artboard>div[style*="text-align: right"]{position:relative;z-index:1}
 .visual-page .carousel-art-actions{display:flex;flex-direction:column;gap:7px;margin:10px 0 4px}
