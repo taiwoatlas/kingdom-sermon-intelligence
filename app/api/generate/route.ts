@@ -149,11 +149,41 @@ export async function POST(request: Request) {
       return errorResponse(502, "INVALID_AI_OUTPUT", "The AI response was not valid structured data. Try again; no draft was overwritten.");
     }
 
-    const resourceArray = parsed && typeof parsed === "object" && "resources" in parsed
+    // Normalize common model-format drift before validating. Some models return the
+    // requested carousel directly (or keyed by resource id) despite being asked for
+    // the required { resources: [...] } envelope.
+    let resourceArray: unknown = parsed && typeof parsed === "object" && "resources" in parsed
       ? (parsed as { resources?: unknown }).resources
       : null;
+
+    if (resourceArray && !Array.isArray(resourceArray) && typeof resourceArray === "object") {
+      resourceArray = Object.entries(resourceArray as Record<string, unknown>).map(([id, value]) => {
+        if (value && typeof value === "object") {
+          const item = value as Record<string, unknown>;
+          return { id: typeof item.id === "string" ? item.id : id, title: item.title ?? title, type: item.type ?? id, content: item.content ?? JSON.stringify(item) };
+        }
+        return { id, title, type: id, content: typeof value === "string" ? value : JSON.stringify(value) };
+      });
+    }
+
+    if (!Array.isArray(resourceArray) && requestedIds.length === 1 && requestedIds[0] === "carousel" && parsed && typeof parsed === "object") {
+      const root = parsed as Record<string, unknown>;
+      let direct: unknown = root.carousel ?? root.content ?? root.data ?? parsed;
+      if (typeof direct === "string") {
+        try { direct = JSON.parse(direct); } catch { direct = null; }
+      }
+      if (direct && typeof direct === "object" && Array.isArray((direct as Record<string, unknown>).slides)) {
+        resourceArray = [{
+          id: "carousel",
+          title: typeof root.title === "string" ? root.title : title,
+          type: "carousel",
+          content: JSON.stringify(direct),
+        }];
+      }
+    }
+
     if (!Array.isArray(resourceArray)) {
-      return errorResponse(502, "INVALID_AI_OUTPUT", "The AI response did not contain the required resource list. Try again; no draft was overwritten.");
+      return errorResponse(502, "INVALID_AI_OUTPUT", "The AI response did not contain a usable resource list or carousel structure. Your transcript is still available; try again.");
     }
 
     const resources = resourceArray.filter((item): item is Record<string, unknown> =>
