@@ -5,6 +5,7 @@ export const maxDuration = 60;
 
 const MAX_TRANSCRIPT_CHARS = 16000;
 const ALLOWED_IDS = new Set([
+  "carousel",
   "summary",
   "outline",
   "scriptures",
@@ -27,6 +28,7 @@ OUTPUT
 Return one valid JSON object only, with a "resources" array containing exactly the requested resources. The user request lists the required ids; include each requested id exactly once and do not include other ids. Each object must contain: id, title, type, content. Content must be useful, specific to this transcript, and editable. Do not include markdown fences. Every item is a draft requiring human review.
 
 RESOURCE REQUIREMENTS
+- carousel: the content field must be a JSON-encoded string with schema {"slides":[{"headline":"...","body":"...","scripture":"optional reference","footer":"short branding line","visualDirection":"..."}],"designNotes":"..."}. Create 6 to 8 connected vertical social carousel slides. Slide 1 must be a compelling hook; middle slides teach the sermon’s actual main points in sequence; include a practical application/reflection slide and a final takeaway. Make the copy specific to this transcript. Each headline under 12 words; each body under 55 words. No markdown fences or extra fields.
 - summary: title, central message, concise summary, audience relevance, and any uncertainty notes.
 - outline: sermon title/theme, ordered main points and subpoints, conclusion and practical applications, preserving the sermon flow.
 - scriptures: references mentioned or clearly indicated, surrounding transcript context, and explicit needs_review status. Do not invent missing chapter/verse references or verse text.
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
     return errorResponse(413, "TRANSCRIPT_TOO_LONG", "This free-plan workflow currently accepts up to 16,000 transcript characters per generation. Shorten the transcript or split it into sections.");
   }
 
-  const allowedIds = ["summary", "outline", "scriptures", "devotional", "discussion", "social", "quotes", "slides"];
+  const allowedIds = ["carousel", "summary", "outline", "scriptures", "devotional", "discussion", "social", "quotes", "slides"];
   const requestedIds = input.resourceIds === undefined
     ? allowedIds
     : Array.isArray(input.resourceIds) && input.resourceIds.length > 0 &&
@@ -110,13 +112,13 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: "openai/gpt-oss-20b",
         temperature: 0.2,
-        max_completion_tokens: 4200,
+        max_completion_tokens: 6000,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
             role: "user",
-            content: "Create draft resources with exactly these ids: " + requestedIds.join(", ") + ". Generate only those requested resources; do not generate the others. Follow these creative settings carefully: write in " + language + "; target audience: " + audience + "; editorial tone: " + tone + "; social platforms: " + platforms + ". Preserve the sermon meaning while adapting vocabulary and examples to the audience. For languages other than English, write the resource content in the selected language while preserving proper names and Bible references accurately. Keep Scripture references traceable and flag uncertain translations/references for human review. Use the metadata only as supplied; do not treat it as proof of any sermon claim.\nMETADATA:\n" +
+            content: "Create draft resources with exactly these ids: " + requestedIds.join(", ") + ". Generate only those requested resources; do not generate the others. Follow these creative settings carefully: write in " + language + "; target audience: " + audience + "; editorial tone: " + tone + "; social platforms: " + platforms + ". Preserve the sermon meaning while adapting vocabulary and examples to the audience. For languages other than English, write the resource content in the selected language while preserving proper names and Bible references accurately. Keep Scripture references traceable and flag uncertain translations/references for human review. For the carousel resource, the content field itself must be a JSON string with a slides array. Use the metadata only as supplied; do not treat it as proof of any sermon claim.\nMETADATA:\n" +
               JSON.stringify(metadata) + "\n\nBEGIN UNTRUSTED SERMON TRANSCRIPT\n" + transcript + "\nEND UNTRUSTED SERMON TRANSCRIPT",
           },
         ],
