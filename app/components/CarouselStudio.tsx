@@ -3,12 +3,16 @@
 import { useMemo, useState } from "react";
 import { Download, Image as ImageIcon } from "lucide-react";
 
-type Slide = { headline: string; body: string; scripture?: string; footer?: string; visualDirection?: string };
+type Slide = { headline: string; body: string; scripture?: string; footer?: string; visualDirection?: string; designStyle?: string; accentColor?: string; backgroundColor?: string };
 type Deck = { slides: Slide[]; designNotes?: string };
 const themes = {
   evergreen: { label: "Evergreen editorial", bg: "#102b22", accent: "#b9e5c8", text: "#fffaf0" },
   cream: { label: "Warm cream", bg: "#f5efe3", accent: "#276449", text: "#202b24" },
   midnight: { label: "Midnight gold", bg: "#15171d", accent: "#e5bd70", text: "#fffaf2" },
+  paper: { label: "Paper collage", bg: "#f4dfc9", accent: "#b94b37", text: "#30221d" },
+  botanical: { label: "Botanical study", bg: "#e8efe2", accent: "#2e654d", text: "#18392c" },
+  electric: { label: "Electric modern", bg: "#25144b", accent: "#f6e84a", text: "#fffdf5" },
+  ocean: { label: "Deep ocean", bg: "#103d48", accent: "#7de0d0", text: "#f4fffc" },
 };
 type Theme = keyof typeof themes;
 
@@ -36,33 +40,53 @@ function wrap(value: string, max: number) {
   return lines;
 }
 
-export default function CarouselStudio({ content, title, onChange }: { content: string; title: string; onChange: (value: string) => void }) {
+export default function CarouselStudio({ content, title, author, onChange }: { content: string; title: string; author?: string; onChange: (value: string) => void }) {
   const [themeKey, setThemeKey] = useState<Theme>("evergreen");
   const deck = useMemo(() => parseDeck(content), [content]);
   const theme = themes[themeKey];
+  const paletteKeys = Object.keys(themes) as Theme[];
+  function slideTheme(slide: Slide, index: number) {
+    const style = paletteKeys.includes(slide.designStyle as Theme) ? slide.designStyle as Theme : paletteKeys[index % paletteKeys.length];
+    const base = themes[style];
+    const validHex = (value: string | undefined, fallback: string) => value && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+    return { key: style, ...base, bg: validHex(slide.backgroundColor, base.bg), accent: validHex(slide.accentColor, base.accent) };
+  }
   function patchSlide(index: number, patch: Partial<Slide>) {
     onChange(JSON.stringify({ ...deck, slides: deck.slides.map((s, i) => i === index ? { ...s, ...patch } : s) }, null, 2));
   }
   function exportSlide(index: number, format: "png" | "svg") {
     const slide = deck.slides[index];
     if (!slide) return;
-    const heading = wrap(slide.headline, 23).slice(0, 4).map((line, i) => '<text x="88" y="' + (370 + i * 76) + '" font-family="Arial,Helvetica,sans-serif" font-size="61" font-weight="700" fill="' + theme.text + '">' + escapeXml(line) + "</text>").join("");
+    const t = slideTheme(slide, index);
+    const heading = wrap(slide.headline, slide.headline.length < 32 ? 16 : 22).slice(0, 5).map((line, i) => '<text x="86" y="' + (350 + i * 82) + '" font-family="Georgia,Times New Roman,serif" font-size="64" font-weight="700" letter-spacing="-2" fill="' + t.text + '">' + escapeXml(line) + "</text>").join("");
     const bodyStart = 420 + wrap(slide.headline, 23).slice(0, 4).length * 76;
-    const body = wrap(slide.body, 31).slice(0, 8).map((line, i) => '<text x="90" y="' + (bodyStart + i * 43) + '" font-family="Arial,Helvetica,sans-serif" font-size="28" fill="' + theme.text + '" opacity=".88">' + escapeXml(line) + "</text>").join("");
-    const scripture = slide.scripture ? '<text x="90" y="1040" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="700" fill="' + theme.accent + '">' + escapeXml(slide.scripture) + "</text>" : "";
-    const footer = escapeXml(slide.footer || title || "KINGDOM SERMON INTELLIGENCE");
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350"><rect width="1080" height="1350" fill="' + theme.bg + '"/><circle cx="960" cy="110" r="230" fill="' + theme.accent + '" opacity=".10"/><rect x="74" y="80" width="70" height="7" rx="3" fill="' + theme.accent + '"/><text x="90" y="170" font-family="Arial,Helvetica,sans-serif" font-size="22" letter-spacing="5" fill="' + theme.accent + '">SERMON NOTES · ' + String(index + 1).padStart(2, "0") + "</text>" + heading + body + scripture + '<line x1="90" y1="1165" x2="990" y2="1165" stroke="' + theme.accent + '" stroke-opacity=".5"/><text x="90" y="1215" font-family="Arial,Helvetica,sans-serif" font-size="19" letter-spacing="2" fill="' + theme.text + '" opacity=".75">' + footer + '</text><text x="90" y="1270" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="' + theme.accent + '">KEEP THIS MESSAGE CLOSE</text></svg>';
+    const body = wrap(slide.body, 34).slice(0, 7).map((line, i) => '<text x="90" y="' + (bodyStart + i * 42) + '" font-family="Arial,Helvetica,sans-serif" font-size="28" fill="' + t.text + '" opacity=".9">' + escapeXml(line) + "</text>").join("");
+    const scripture = slide.scripture ? '<text x="90" y="1040" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="700" fill="' + t.accent + '">' + escapeXml(slide.scripture) + "</text>" : "";
+    const footer = escapeXml(slide.footer || "SAVE THIS MESSAGE");
+    const signature = escapeXml(author?.trim() || "");
+    const motif = t.key === "botanical"
+      ? '<path d="M790 100 C940 150 970 290 880 410 C840 300 810 220 790 100Z" fill="' + t.accent + '" opacity=".18"/><path d="M790 100 C850 210 875 290 880 410" stroke="' + t.accent + '" stroke-width="5" fill="none" opacity=".55"/>'
+      : t.key === "paper"
+      ? '<path d="M720 85 L1030 135 L960 420 L680 350Z" fill="' + t.accent + '" opacity=".17"/><circle cx="930" cy="220" r="110" fill="' + t.accent + '" opacity=".12"/>'
+      : t.key === "electric"
+      ? '<path d="M760 90 L1030 90 L1030 355 L890 300Z" fill="' + t.accent + '" opacity=".22"/><circle cx="900" cy="250" r="125" fill="none" stroke="' + t.accent + '" stroke-width="3"/>'
+      : t.key === "ocean"
+      ? '<path d="M700 110 Q820 20 940 110 T1180 110" stroke="' + t.accent + '" stroke-width="5" fill="none" opacity=".45"/><path d="M700 160 Q820 70 940 160 T1180 160" stroke="' + t.accent + '" stroke-width="3" fill="none" opacity=".35"/>'
+      : t.key === "midnight"
+      ? '<circle cx="930" cy="180" r="120" fill="' + t.accent + '" opacity=".13"/><circle cx="930" cy="180" r="88" fill="none" stroke="' + t.accent + '" stroke-width="2" opacity=".55"/>'
+      : '<circle cx="930" cy="180" r="180" fill="' + t.accent + '" opacity=".10"/><path d="M760 90 L1020 350" stroke="' + t.accent + '" stroke-width="3" opacity=".45"/>';
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="2160" height="2700" viewBox="0 0 1080 1350"><rect width="1080" height="1350" fill="' + t.bg + '">' + '</rect>' + motif + '<rect x="76" y="80" width="52" height="6" rx="3" fill="' + t.accent + '"/><text x="86" y="150" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="700" letter-spacing="3" fill="' + t.accent + '">' + escapeXml((title || "MESSAGE NOTES").toUpperCase().slice(0, 42)) + '</text>' + heading + body + scripture + '<line x1="86" y1="1160" x2="994" y2="1160" stroke="' + t.accent + '" stroke-opacity=".5"/><text x="86" y="1210" font-family="Arial,Helvetica,sans-serif" font-size="16" letter-spacing="1.4" fill="' + t.text + '" opacity=".68">' + footer + '</text><text x="994" y="1270" text-anchor="end" font-family="Georgia,serif" font-style="italic" font-size="25" fill="' + t.text + '">' + signature + '</text><text x="86" y="1300" font-family="Arial,Helvetica,sans-serif" font-size="12" letter-spacing="2" fill="' + t.accent + '">' + String(index + 1).padStart(2, "0") + " / " + String(deck.slides.length).padStart(2, "0") + '</text></svg>';
     const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-    const filename = (title || "sermon-carousel").toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-slide-" + (index + 1);
+    const filename = (title || "message-carousel").toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-slide-" + (index + 1);
     if (format === "svg") {
       const a = document.createElement("a"); a.href = url; a.download = filename + ".svg"; a.click(); URL.revokeObjectURL(url); return;
     }
     const image = new window.Image();
     image.onload = () => {
-      const canvas = document.createElement("canvas"); canvas.width = 1080; canvas.height = 1350;
+      const canvas = document.createElement("canvas"); canvas.width = 2160; canvas.height = 2700;
       const ctx = canvas.getContext("2d");
       if (!ctx) { URL.revokeObjectURL(url); return; }
-      ctx.drawImage(image, 0, 0);
+      ctx.scale(2, 2); ctx.drawImage(image, 0, 0, 1080, 1350);
       canvas.toBlob((blob) => {
         if (blob) { const pngUrl = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = pngUrl; a.download = filename + ".png"; a.click(); URL.revokeObjectURL(pngUrl); }
         URL.revokeObjectURL(url);
@@ -73,16 +97,16 @@ export default function CarouselStudio({ content, title, onChange }: { content: 
   }
   return <section className="panel carousel-studio-panel">
     <div className="carousel-studio-heading">
-      <div><div className="eyebrow"><ImageIcon size={14} /> VISUAL CONTENT STUDIO</div><h2>Your sermon carousel</h2><p>Review each slide, edit the wording, choose a visual theme, then export image files.</p></div>
-      <div className="carousel-theme-control"><label htmlFor="carousel-theme">Design theme</label><select id="carousel-theme" value={themeKey} onChange={(e) => setThemeKey(e.target.value as Theme)}>{Object.entries(themes).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></div>
+      <div><div className="eyebrow"><ImageIcon size={14} /> MESSAGE-LED DESIGN STUDIO</div><h2>Your message carousel</h2><p>Different colour stories and graphic motifs guided by the message, not a generic template.</p></div>
+      <div className="carousel-theme-control"><label htmlFor="carousel-theme">Fallback design style</label><select id="carousel-theme" value={themeKey} onChange={(e) => setThemeKey(e.target.value as Theme)}>{Object.entries(themes).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></div>
     </div>
     {deck.slides.length ? <>
       <div className="carousel-preview-grid">{deck.slides.map((slide, index) => <article className="carousel-slide-editor" key={index}>
-        <div className="carousel-artboard" style={{ background: theme.bg, color: theme.text }}><div className="carousel-artboard-kicker" style={{ color: theme.accent }}>SERMON NOTES · {String(index + 1).padStart(2, "0")}</div><div className="carousel-artboard-rule" style={{ background: theme.accent }} /><h3>{slide.headline}</h3><p>{slide.body}</p>{slide.scripture && <strong style={{ color: theme.accent }}>{slide.scripture}</strong>}<div className="carousel-artboard-footer">{slide.footer || title || "KINGDOM SERMON INTELLIGENCE"}</div></div>
-        <div className="carousel-slide-fields"><label>Slide headline<input value={slide.headline} onChange={(e) => patchSlide(index, { headline: e.target.value })} maxLength={120} /></label><label>Slide text<textarea value={slide.body} onChange={(e) => patchSlide(index, { body: e.target.value })} rows={3} maxLength={600} /></label><label>Scripture reference<input value={slide.scripture || ""} onChange={(e) => patchSlide(index, { scripture: e.target.value })} placeholder="Optional reference" /></label><div className="carousel-export-actions"><button className="secondary-button" onClick={() => exportSlide(index, "png")}><Download size={14} /> PNG</button><button className="secondary-button" onClick={() => exportSlide(index, "svg")}><Download size={14} /> SVG</button></div></div>
+        <div className={"carousel-artboard artboard-" + slideTheme(slide, index).key} style={{ background: slideTheme(slide, index).bg, color: slideTheme(slide, index).text, borderTop: "5px solid " + slideTheme(slide, index).accent, "--art-accent": slideTheme(slide, index).accent } as React.CSSProperties}><div className="carousel-artboard-kicker" style={{ color: slideTheme(slide, index).accent }}>{(title || "MESSAGE").toUpperCase().slice(0, 24)} · {String(index + 1).padStart(2, "0")}</div><div className="carousel-artboard-rule" style={{ background: slideTheme(slide, index).accent }} /><h3>{slide.headline}</h3><p>{slide.body}</p>{slide.scripture && <strong style={{ color: slideTheme(slide, index).accent }}>{slide.scripture}</strong>}<div className="carousel-artboard-footer">{slide.footer || "SAVE THIS MESSAGE"}</div><div style={{ textAlign: "right", fontFamily: "Georgia,serif", fontStyle: "italic", fontSize: 10, marginTop: 6 }}>{author || ""}</div></div>
+        <div className="carousel-slide-fields"><label>Slide headline<input value={slide.headline} onChange={(e) => patchSlide(index, { headline: e.target.value })} maxLength={120} /></label><label>Slide text<textarea value={slide.body} onChange={(e) => patchSlide(index, { body: e.target.value })} rows={3} maxLength={600} /></label><label>Visual direction<input value={slide.visualDirection || ""} onChange={(e) => patchSlide(index, { visualDirection: e.target.value })} placeholder="Message-specific composition / motif" /></label><label>Scripture / source reference<input value={slide.scripture || ""} onChange={(e) => patchSlide(index, { scripture: e.target.value })} placeholder="Optional reference" /></label><div className="carousel-export-actions"><button className="secondary-button" onClick={() => exportSlide(index, "png")}><Download size={14} /> PNG</button><button className="secondary-button" onClick={() => exportSlide(index, "svg")}><Download size={14} /> SVG</button></div></div>
       </article>)}</div>
-      <div className="carousel-deck-footer"><span>{deck.slides.length} slides · 1080 × 1350 export size</span><button className="primary-button" onClick={() => deck.slides.forEach((_, index) => exportSlide(index, "svg"))}><Download size={16} /> Export all slides as SVG</button></div>
+      <div className="carousel-deck-footer"><span>{deck.slides.length} slides · 2160 × 2700 PNG · scalable SVG</span><button className="primary-button" onClick={() => deck.slides.forEach((_, index) => exportSlide(index, "svg"))}><Download size={16} /> Export all slides as SVG</button></div>
       {deck.designNotes && <p className="carousel-design-notes"><b>Design notes:</b> {deck.designNotes}</p>}
-    </> : <div className="carousel-empty"><ImageIcon size={32} /><h3>Your visual slides will appear here</h3><p>Paste the sermon transcript, select “Visual carousel deck,” then generate content. The AI will create slide-by-slide copy that you can edit and export as actual image files.</p></div>}
+    </> : <div className="carousel-empty"><ImageIcon size={32} /><h3>Your visual slides will appear here</h3><p>Paste any long message, generate a carousel, then refine each slide and export high-resolution images.</p></div>}
   </section>;
 }
