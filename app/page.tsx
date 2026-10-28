@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHandshake, Lightbulb, ListChecks, Menu, MessageCircle, Mic2, Plus, RefreshCw, Search, Settings2, Share2, Sparkles, WandSparkles } from "lucide-react";
 
-type Resource = { id: string; title: string; type: string; content: string; status: "Draft" | "Needs review" | "Approved" };
+type Revision = { id: string; resourceId: string; title: string; content: string; status: "Draft" | "Needs review" | "Approved"; action: string; createdAt: string; actor: string };
+type Resource = { id: string; title: string; type: string; content: string; status: "Draft" | "Needs review" | "Approved"; approvedAt?: string; approvedBy?: string };
 type SavedSermon = { id: string; title: string; speaker: string; scripture: string; date: string; transcript: string; resources: Resource[]; updatedAt: string };
 
 const starterResources: Resource[] = [
@@ -26,6 +27,7 @@ export default function Home() {
   const [activeId, setActiveId] = useState("summary");
   const [resources, setResources] = useState<Resource[]>(starterResources);
   const [library, setLibrary] = useState<SavedSermon[]>([]);
+  const [revisions, setRevisions] = useState<Record<string, Revision[]>>({});
   const [libraryQuery, setLibraryQuery] = useState("");
   const [selectedSermonId, setSelectedSermonId] = useState("");
   const [query, setQuery] = useState("");
@@ -44,6 +46,7 @@ export default function Home() {
         if (typeof data.date === "string") setDate(data.date);
         if (typeof data.transcript === "string") setTranscript(data.transcript);
         if (Array.isArray(data.resources) && data.resources.every((r: Resource) => typeof r.id === "string" && typeof r.content === "string")) setResources(data.resources);
+        if (data.revisions && typeof data.revisions === "object" && !Array.isArray(data.revisions)) setRevisions(data.revisions);
       }
     } catch { /* Ignore malformed local data. */ }
     try { const savedLibrary = localStorage.getItem("kingdom-sermon-library-v1"); if (savedLibrary) { const parsed = JSON.parse(savedLibrary); if (Array.isArray(parsed)) setLibrary(parsed.filter((item: SavedSermon) => item && typeof item.id === "string" && Array.isArray(item.resources))); } } catch { /* Ignore malformed archive data. */ }
@@ -51,13 +54,30 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (!hydrated) return;
-    try { localStorage.setItem("kingdom-sermon-intelligence-v1", JSON.stringify({ sermonTitle, speaker, scripture, date, transcript, resources })); }
+    try { localStorage.setItem("kingdom-sermon-intelligence-v1", JSON.stringify({ sermonTitle, speaker, scripture, date, transcript, resources, revisions })); }
     catch { setNotice("Your browser could not save more local data. Export important drafts as text files."); }
   }, [hydrated, sermonTitle, speaker, scripture, date, transcript, resources]);
 
   useEffect(() => { if (!hydrated) return; try { localStorage.setItem("kingdom-sermon-library-v1", JSON.stringify(library)); } catch { setNotice("The browser could not save the full library. Export your sermon pack for safekeeping."); } }, [hydrated, library]);
 
   const active = resources.find((r) => r.id === activeId) ?? resources[0];
+  const activeRevisions = (revisions[activeId] || []).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  function recordRevision(resource: Resource, action: string) {
+    const entry: Revision = { id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 7), resourceId: resource.id, title: resource.title, content: resource.content, status: resource.status, action, createdAt: new Date().toISOString(), actor: "Local owner" };
+    setRevisions((old) => ({ ...old, [resource.id]: [entry, ...(old[resource.id] || [])].slice(0, 20) }));
+  }
+
+  function saveActiveRevision() {
+    recordRevision(active, "Manual version saved");
+    setNotice("Version saved. You can restore it from the revision history.");
+  }
+
+  function restoreRevision(revision: Revision) {
+    recordRevision(active, "Snapshot before restoring an older version");
+    setResources((old) => old.map((item) => item.id === activeId ? { ...item, title: revision.title, content: revision.content, status: "Draft", approvedAt: undefined, approvedBy: undefined } : item));
+    setNotice("Previous version restored as a draft. Review it before approving again.");
+  }
   const filteredLibrary = library.filter((item) => [item.title, item.speaker, item.scripture].some((value) => (value || "").toLowerCase().includes(libraryQuery.toLowerCase()))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const filtered = useMemo(() => resources.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()) || r.type.toLowerCase().includes(query.toLowerCase())), [resources, query]);
 
@@ -118,7 +138,8 @@ export default function Home() {
         return;
       }
       const replacement = result.resources[0] as Resource;
-      setResources((old) => old.map((item) => item.id === activeId ? { ...replacement, status: "Needs review" } : item));
+      recordRevision(active, "Previous version saved before regeneration");
+      setResources((old) => old.map((item) => item.id === activeId ? { ...replacement, status: "Needs review", approvedAt: undefined, approvedBy: undefined } : item));
       setNotice("Selected resource regenerated. Review it against the sermon; your other resources were not changed.");
     } catch {
       setNotice("Could not reach the generation endpoint. Your current draft has been kept.");
@@ -161,7 +182,7 @@ export default function Home() {
   }
 
   function updateActive(content: string) {
-    setResources((old) => old.map((r) => r.id === activeId ? { ...r, content, status: "Draft" } : r));
+    setResources((old) => old.map((r) => r.id === activeId ? { ...r, content, status: "Draft", approvedAt: undefined, approvedBy: undefined } : r));
     setNotice("");
   }
 
@@ -185,8 +206,11 @@ export default function Home() {
   }
 
   function markApproved() {
-    setResources((old) => old.map((r) => r.id === activeId ? { ...r, status: "Approved" } : r));
-    setNotice("Marked approved in this session. This does not publish anything.");
+    const approvedAt = new Date().toISOString();
+    const approvedResource: Resource = { ...active, status: "Approved", approvedAt, approvedBy: "Local owner" };
+    setResources((old) => old.map((r) => r.id === activeId ? approvedResource : r));
+    recordRevision(approvedResource, "Approved by Local owner");
+    setNotice("Approval recorded locally with a timestamp. This does not publish anything; there is no signed-in user identity yet.");
   }
 
   return (
@@ -237,10 +261,12 @@ export default function Home() {
           </div>
 
           <section className="panel editor-panel">
-            <div className="editor-top"><div className="editor-title"><div className="heading-icon blue"><FileText size={18} /></div><div><h2>{active.title}</h2><p>{sermonTitle.trim() || "Untitled sermon"}{speaker.trim() ? " · " + speaker.trim() : ""}{date ? " · " + date : ""}</p></div></div><div className="editor-actions"><button className="secondary-button" onClick={copyDraft}><Clipboard size={15} /> Copy</button><button className="secondary-button" onClick={downloadDraft}><Download size={15} /> Export .txt</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Full pack</button><button className="secondary-button" onClick={regenerateActiveResource} disabled={generating || !transcript.trim()}><RefreshCw size={15} /> {generating ? "Working…" : "Regenerate this resource"}</button><button className="approve-button" onClick={markApproved}><Check size={16} /> Approve draft</button></div></div>
+            <div className="editor-top"><div className="editor-title"><div className="heading-icon blue"><FileText size={18} /></div><div><h2>{active.title}</h2><p>{sermonTitle.trim() || "Untitled sermon"}{speaker.trim() ? " · " + speaker.trim() : ""}{date ? " · " + date : ""}</p></div></div><div className="editor-actions"><button className="secondary-button" onClick={copyDraft}><Clipboard size={15} /> Copy</button><button className="secondary-button" onClick={downloadDraft}><Download size={15} /> Export .txt</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Full pack</button><button className="secondary-button" onClick={regenerateActiveResource} disabled={generating || !transcript.trim()}><RefreshCw size={15} /> {generating ? "Working…" : "Regenerate this resource"}</button><button className="secondary-button" onClick={saveActiveRevision}><FileText size={15} /> Save version</button><button className="approve-button" onClick={markApproved}><Check size={16} /> Approve draft</button></div></div>
             <div className="editor-label"><span>EDITABLE CONTENT</span><span className={`status status-${active.status.toLowerCase().replace(" ", "-")}`}>{active.status}</span></div>
             <textarea className="draft-editor" aria-label="Edit selected resource" value={active.content} onChange={(e) => updateActive(e.target.value)} />
-            <div className="editor-footer"><span><span className="tiny-lock">✓</span> Changes are saved in this browser only.</span><button className="text-button" onClick={() => { setResources((old) => old.map((r) => r.id === activeId ? { ...r, content: "" , status: "Draft" } : r)); setNotice("Draft cleared."); }}><Plus size={14} /> Clear draft</button></div>
+            <div className="editor-footer"><span><span className="tiny-lock">✓</span> Changes are saved in this browser only.</span><button className="text-button" onClick={() => { recordRevision(active, "Saved before clearing draft"); setResources((old) => old.map((r) => r.id === activeId ? { ...r, content: "", status: "Draft", approvedAt: undefined, approvedBy: undefined } : r)); setNotice("Draft cleared. Its previous version was saved to history."); }}><Plus size={14} /> Clear draft</button></div>
+            {active.status === "Approved" && active.approvedAt && <div className="approval-audit"><Check size={15} /><span><b>Approved locally</b><small>{active.approvedBy || "Local owner"} · {new Date(active.approvedAt).toLocaleString()}</small></span></div>}
+            <section className="revision-panel"><div className="revision-heading"><div><h3>Revision history</h3><p>Up to 20 saved versions for this resource on this device.</p></div><span className="count-pill">{activeRevisions.length} versions</span></div>{activeRevisions.length ? <div className="revision-list">{activeRevisions.map((revision) => <div className="revision-item" key={revision.id}><div className="revision-copy"><b>{revision.action}</b><small>{new Date(revision.createdAt).toLocaleString()} · {revision.actor} · {revision.status}</small><p>{revision.content.slice(0, 150) || "Empty draft"}{revision.content.length > 150 ? "…" : ""}</p></div><button className="secondary-button" onClick={() => restoreRevision(revision)}>Restore</button></div>)}</div> : <p className="library-empty">No versions saved yet. Choose “Save version” before major edits, or regenerate/approve to create a history entry.</p>}</section>
           </section>
 
           <div className="bottom-note"><div className="bottom-note-icon"><HeartHandshake size={19} /></div><div><b>Built to serve the local church.</b><p>Kingdom Sermon Intelligence assists ministry work; it does not replace the preacher’s voice, biblical study, pastoral discernment, or human review.</p></div><div className="bottom-note-mark"><BookOpen size={23} /></div></div>
