@@ -250,7 +250,7 @@ export async function POST(request: Request) {
           id: item.id,
           title: (item.title as string).slice(0, 120),
           type: (item.type as string).slice(0, 80),
-          content: content.slice(0, 30000),
+          content: item.id === "carousel" ? content : content.slice(0, 30000),
           status: "Needs review" as const,
         };
       }),
