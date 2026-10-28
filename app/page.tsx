@@ -171,7 +171,7 @@ export default function Home() {
       </aside>
 
       <section className="main-area">
-        <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu"><Menu size={20} /></button><div className="breadcrumb">Workspace <span>/</span> <b>Sermon studio</b></div><div className="topbar-right"><span className="local-badge"><span /> Local draft mode</span><button className="icon-button" aria-label="Settings" onClick={() => setNotice("Settings and connected AI services will be configured in a later setup step.")}><Settings2 size={18} /></button><div className="profile">TA</div></div></header>
+        <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu"><Menu size={20} /></button><div className="breadcrumb">Workspace <span>/</span> <b>Sermon studio</b></div><div className="topbar-right"><span className="local-badge"><span /> Free AI mode</span><button className="icon-button" aria-label="Settings" onClick={() => setNotice("AI generation uses the Groq free plan. Add GROQ_API_KEY in Vercel Environment Variables; the key stays on the server. Do not upgrade to a paid plan.")}><Settings2 size={18} /></button><div className="profile">TA</div></div></header>
 
         <div className="page-content">
           <div className="welcome-row"><div><div className="eyebrow"><Sparkles size={14} /> YOUR SERMON, MULTIPLIED WITH CARE</div><h1>Make more of every message.</h1><p className="intro">Turn your sermon into useful church resources while keeping the original message at the centre.</p></div><div className="welcome-icon"><Mic2 size={28} /></div></div>
