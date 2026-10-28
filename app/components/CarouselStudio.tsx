@@ -20,7 +20,7 @@ function parseDeck(content: string): Deck {
   try {
     const data = JSON.parse(content);
     if (data && Array.isArray(data.slides)) return {
-      slides: data.slides.filter((s: unknown) => !!s && typeof s === "object" && typeof (s as Slide).headline === "string" && typeof (s as Slide).body === "string").slice(0, 10),
+      slides: data.slides.filter((s: unknown) => !!s && typeof s === "object" && typeof (s as Slide).headline === "string" && typeof (s as Slide).body === "string"),
       designNotes: typeof data.designNotes === "string" ? data.designNotes : "",
     };
   } catch { /* Empty state until a deck has been generated. */ }
@@ -48,7 +48,7 @@ export default function CarouselStudio({ content, title, author, onChange }: { c
   const deck = useMemo(() => parseDeck(content), [content]);
   const theme = themes[themeKey];
   const paletteKeys = Object.keys(themes) as Theme[];
-  function slideTheme(slide: Slide, index: number) {
+  function slideTheme(slide: Slide, index: number): { key: Theme; label: string; bg: string; accent: string; text: string } {
     const style = paletteKeys.includes(slide.designStyle as Theme) ? slide.designStyle as Theme : paletteKeys[index % paletteKeys.length];
     const base = themes[style];
     const validHex = (value: string | undefined, fallback: string) => value && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
@@ -80,9 +80,9 @@ export default function CarouselStudio({ content, title, author, onChange }: { c
     const slide = deck.slides[index];
     if (!slide) return;
     const t = slideTheme(slide, index);
-    const heading = wrap(slide.headline, slide.headline.length < 32 ? 16 : 22).slice(0, 5).map((line, i) => '<text x="86" y="' + (350 + i * 82) + '" font-family="Georgia,Times New Roman,serif" font-size="64" font-weight="700" letter-spacing="-2" fill="' + t.text + '">' + escapeXml(line) + "</text>").join("");
-    const bodyStart = 420 + wrap(slide.headline, 23).slice(0, 4).length * 76;
-    const body = wrap(slide.body, 34).slice(0, 7).map((line, i) => '<text x="90" y="' + (bodyStart + i * 42) + '" font-family="Arial,Helvetica,sans-serif" font-size="28" fill="' + t.text + '" opacity=".9">' + escapeXml(line) + "</text>").join("");
+    const heading = wrap(slide.headline, slide.headline.length < 32 ? 16 : 22).map((line, i) => '<text x="86" y="' + (300 + i * 72) + '" font-family="Georgia,Times New Roman,serif" font-size="58" font-weight="700" letter-spacing="-1" fill="' + t.text + '">' + escapeXml(line) + "</text>").join("");
+    const bodyStart = slide.headline ? 370 + wrap(slide.headline, 23).length * 66 : 330;
+    const body = wrap(slide.body, 46).map((line, i) => '<text x="90" y="' + (bodyStart + i * 43) + '" font-family="Arial,Helvetica,sans-serif" font-size="30" fill="' + t.text + '" opacity=".96">' + escapeXml(line) + "</text>").join("");
     const scripture = slide.scripture ? '<text x="90" y="1040" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="700" fill="' + t.accent + '">' + escapeXml(slide.scripture) + "</text>" : "";
     const footer = escapeXml(slide.footer || "SAVE THIS MESSAGE");
     const artwork = artImages[index] ? '<image href="' + artImages[index] + '" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice" opacity=".78"/><rect width="1080" height="1350" fill="' + t.bg + '" opacity=".56"/>' : "";
