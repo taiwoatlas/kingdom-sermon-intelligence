@@ -56,7 +56,7 @@ export default function Home() {
     if (!hydrated) return;
     try { localStorage.setItem("kingdom-sermon-intelligence-v1", JSON.stringify({ sermonTitle, speaker, scripture, date, transcript, resources, revisions })); }
     catch { setNotice("Your browser could not save more local data. Export important drafts as text files."); }
-  }, [hydrated, sermonTitle, speaker, scripture, date, transcript, resources]);
+  }, [hydrated, sermonTitle, speaker, scripture, date, transcript, resources, revisions]);
 
   useEffect(() => { if (!hydrated) return; try { localStorage.setItem("kingdom-sermon-library-v1", JSON.stringify(library)); } catch { setNotice("The browser could not save the full library. Export your sermon pack for safekeeping."); } }, [hydrated, library]);
 
