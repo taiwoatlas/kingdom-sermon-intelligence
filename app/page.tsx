@@ -78,7 +78,11 @@ export default function Home() {
     setResources((old) => old.map((item) => item.id === activeId ? { ...item, title: revision.title, content: revision.content, status: "Draft", approvedAt: undefined, approvedBy: undefined } : item));
     setNotice("Previous version restored as a draft. Review it before approving again.");
   }
-  const filteredLibrary = library.filter((item) => [item.title, item.speaker, item.scripture].some((value) => (value || "").toLowerCase().includes(libraryQuery.toLowerCase()))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const filteredLibrary = library.filter((item) => {
+    const term = libraryQuery.toLowerCase().trim();
+    if (!term) return true;
+    return [item.title, item.speaker, item.scripture, item.transcript, ...item.resources.flatMap((resource) => [resource.title, resource.content])].some((value) => (value || "").toLowerCase().includes(term));
+  }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const filtered = useMemo(() => resources.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()) || r.type.toLowerCase().includes(query.toLowerCase())), [resources, query]);
 
   async function prepareDrafts() {
@@ -145,6 +149,60 @@ export default function Home() {
       setNotice("Could not reach the generation endpoint. Your current draft has been kept.");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function importTranscriptText(file?: File) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".txt") && file.type !== "text/plain") {
+      setNotice("Choose a plain-text .txt transcript file.");
+      return;
+    }
+    try {
+      const text = await file.text();
+      if (!text.trim()) { setNotice("That text file is empty."); return; }
+      if (text.length > 16000) { setNotice("This transcript is " + text.length.toLocaleString() + " characters. The current free AI workflow accepts up to 16,000; shorten the file before importing."); return; }
+      setTranscript(text);
+      if (!sermonTitle.trim()) setSermonTitle(file.name.replace(/\\.txt$/i, "").replace(/[_-]+/g, " "));
+      setNotice("Transcript imported from " + file.name + ". Check the text before generating resources.");
+    } catch {
+      setNotice("The transcript file could not be read. Try saving it as UTF-8 plain text.");
+    }
+  }
+
+  function exportBackup() {
+    const backup = { app: "Kingdom Sermon Intelligence", schemaVersion: 1, exportedAt: new Date().toISOString(), current: { sermonTitle, speaker, scripture, date, transcript, resources, revisions }, library };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a"); link.href = url; link.download = "kingdom-sermon-intelligence-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+    link.click(); URL.revokeObjectURL(url);
+    setNotice("Full backup exported, including the current sermon, local library, resource versions and approval timestamps. Store this file somewhere safe.");
+  }
+
+  async function importBackup(file?: File) {
+    if (!file) return;
+    try {
+      if (file.size > 15 * 1024 * 1024) { setNotice("Backup is larger than 15 MB. Choose a smaller backup file."); return; }
+      const backup = JSON.parse(await file.text());
+      const validResources = (items: unknown) => Array.isArray(items) && items.every((item) => item && typeof item.id === "string" && typeof item.title === "string" && typeof item.type === "string" && typeof item.content === "string" && ["Draft", "Needs review", "Approved"].includes(item.status));
+      if (!backup || backup.app !== "Kingdom Sermon Intelligence" || backup.schemaVersion !== 1 || !backup.current || typeof backup.current.transcript !== "string" || !validResources(backup.current.resources) || !Array.isArray(backup.library) || !backup.library.every((item: SavedSermon) => item && typeof item.id === "string" && typeof item.title === "string" && typeof item.transcript === "string" && validResources(item.resources))) {
+        setNotice("This file is not a valid Kingdom Sermon Intelligence backup. Nothing was imported.");
+        return;
+      }
+      const current = backup.current;
+      setSermonTitle(typeof current.sermonTitle === "string" ? current.sermonTitle : "");
+      setSpeaker(typeof current.speaker === "string" ? current.speaker : "");
+      setScripture(typeof current.scripture === "string" ? current.scripture : "");
+      setDate(typeof current.date === "string" ? current.date : "");
+      setTranscript(current.transcript);
+      setResources(current.resources);
+      setRevisions(current.revisions && typeof current.revisions === "object" && !Array.isArray(current.revisions) ? current.revisions : {});
+      setLibrary(backup.library);
+      setSelectedSermonId("");
+      setActiveId(current.resources[0]?.id || "summary");
+      setNotice("Backup imported. Current sermon, library and saved versions have been restored in this browser. Export another backup first if you need to preserve the previous data.");
+    } catch {
+      setNotice("The backup file could not be read as valid JSON. Nothing was imported.");
     }
   }
 
@@ -235,7 +293,7 @@ export default function Home() {
 
           <section className="panel library-panel" id="sermon-library">
             <div className="panel-heading"><div className="heading-icon green"><BookOpen size={18} /></div><div><h2>Sermon library</h2><p>Save, reopen, search and export sermons on this device.</p></div><span className="count-pill">{library.length} saved</span></div>
-            <div className="library-actions"><div className="search-box"><Search size={16} /><input value={libraryQuery} onChange={(e) => setLibraryQuery(e.target.value)} placeholder="Search saved sermons" /></div><button className="secondary-button" onClick={startNewSermon}><Plus size={15} /> New sermon</button><button className="secondary-button" onClick={saveToLibrary}><Check size={15} /> {selectedSermonId ? "Update saved sermon" : "Save sermon"}</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Export full pack</button></div>
+            <div className="library-actions"><div className="search-box"><Search size={16} /><input value={libraryQuery} onChange={(e) => setLibraryQuery(e.target.value)} placeholder="Search sermons, transcripts, resources" /></div><button className="secondary-button" onClick={startNewSermon}><Plus size={15} /> New sermon</button><button className="secondary-button" onClick={saveToLibrary}><Check size={15} /> {selectedSermonId ? "Update saved sermon" : "Save sermon"}</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Export full pack</button><button className="secondary-button" onClick={exportBackup}><Download size={15} /> Backup all</button><button className="secondary-button" onClick={() => document.getElementById("backup-import")?.click()}>Import backup</button><input id="backup-import" type="file" accept=".json,application/json" hidden onChange={(e) => { void importBackup(e.target.files?.[0]); e.currentTarget.value = ""; }} /></div>
             {filteredLibrary.length ? <div className="library-list">{filteredLibrary.map((item) => <div className="library-item" key={item.id}><button className="library-open" onClick={() => openSavedSermon(item)}><b>{item.title || "Untitled sermon"}</b><small>{item.speaker || "Speaker not set"} · {item.date || "Date not set"} · {item.resources.length} resources</small><small>Last saved: {new Date(item.updatedAt).toLocaleString()}</small></button><button className="text-button" onClick={() => deleteSavedSermon(item.id)} aria-label={"Delete " + item.title}>Delete</button></div>)}</div> : <p className="library-empty">{libraryQuery ? "No saved sermons match that search." : "Your archive is empty. Add sermon details and a transcript, then choose Save sermon. Your library stays in this browser and does not sync across devices."}</p>}
           </section>
 
@@ -245,7 +303,7 @@ export default function Home() {
             <section className="panel sermon-panel">
               <div className="panel-heading"><div className="heading-icon green"><Mic2 size={18} /></div><div><h2>Sermon details</h2><p>Start with the message you want to develop.</p></div></div>
               <div className="form-grid"><label className="field full"><span>Sermon title</span><input value={sermonTitle} onChange={(e) => setSermonTitle(e.target.value)} placeholder="e.g. Faith That Moves Forward" required /></label><label className="field"><span>Speaker</span><input value={speaker} onChange={(e) => setSpeaker(e.target.value)} placeholder="Pastor / speaker" /></label><label className="field"><span>Date preached</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label className="field full"><span>Key Scripture references</span><input value={scripture} onChange={(e) => setScripture(e.target.value)} placeholder="e.g. Hebrews 11:1–6" /></label></div>
-              <div className="transcript-head"><label htmlFor="transcript">Sermon transcript <span className="required">Required</span></label><span>{transcript.length.toLocaleString()} characters</span></div>
+              <div className="transcript-head"><label htmlFor="transcript">Sermon transcript <span className="required">Required</span></label><div className="transcript-tools"><span>{transcript.length.toLocaleString()} characters</span><button className="text-button" onClick={() => document.getElementById("transcript-file")?.click()}>Import .txt</button><input id="transcript-file" type="file" accept=".txt,text/plain" hidden onChange={(e) => { void importTranscriptText(e.target.files?.[0]); e.currentTarget.value = ""; }} /></div></div>
               <textarea id="transcript" value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Paste the sermon transcript here…&#10;&#10;For best results, include the full message and any Scripture references as preached." maxLength={16000} />
               <div className="transcript-foot"><span><span className="tiny-lock">✓</span> Your transcript is saved in this browser only.</span><span>Text only · Up to 16,000 characters</span></div>
               <button className="primary-button" onClick={prepareDrafts} disabled={generating} aria-busy={generating}><WandSparkles size={17} /> {generating ? "Generating resources…" : "Generate sermon resources"} <span>→</span></button>
