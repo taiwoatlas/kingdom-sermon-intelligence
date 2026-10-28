@@ -25,27 +25,42 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const active = resources.find((r) => r.id === activeId) ?? resources[0];
   const filtered = useMemo(() => resources.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()) || r.type.toLowerCase().includes(query.toLowerCase())), [resources, query]);
 
-  function prepareDrafts() {
+  async function prepareDrafts() {
     if (!transcript.trim()) {
       setNotice("Add the sermon transcript first. Drafts should be grounded in the actual message.");
       return;
     }
-    const opening = transcript.trim().slice(0, 1800);
-    const source = scripture.trim() ? "Scripture noted by the user: " + scripture.trim() + "\n\n" : "";
-    setResources([
-      { id: "summary", title: "Sermon summary", type: "Summary", content: source + "SERMON SUMMARY — REVIEW DRAFT\n\nCentral message to identify:\nReview the transcript below and write a concise summary of the preacher’s main claim, supporting teaching, and intended response. Do not treat this starter text as an AI-generated summary.\n\nTranscript excerpt:\n" + opening + (transcript.length > 1800 ? "…" : ""), status: "Needs review" },
-      { id: "outline", title: "Sermon outline", type: "Outline", content: "SERMON OUTLINE — REVIEW DRAFT\n\nUse the transcript to identify the sermon’s actual sequence of ideas. Add the preacher’s main point, each supporting point, the Scriptures used, and the practical conclusion.\n\nTranscript excerpt:\n" + opening, status: "Needs review" },
-      { id: "scriptures", title: "Scripture references", type: "Scripture list", content: "SCRIPTURE VERIFICATION\n\nReferences supplied in sermon metadata: " + (scripture.trim() || "None supplied") + "\n\nCheck each reference against the transcript and the chosen Bible translation. Do not invent missing references. Mark unclear citations for human verification.\n\nTranscript excerpt:\n" + opening, status: "Needs review" },
-      { id: "devotional", title: "Devotional draft", type: "Devotional", content: "DEVOTIONAL — REVIEW DRAFT\n\nKey truth from the message:\n[Identify from the transcript]\n\nReflection:\n[Explain the sermon’s teaching faithfully]\n\nPersonal application:\n[Add a practical response consistent with the message]\n\nPrayer:\n[Write a prayer grounded in the sermon]\n\nTranscript excerpt:\n" + opening, status: "Needs review" },
-      { id: "discussion", title: "Small-group guide", type: "Discussion guide", content: "SMALL-GROUP GUIDE — REVIEW DRAFT\n\n1. What was the central message of this sermon?\n2. Which teaching or Scripture helped you understand it?\n3. What question would you like to explore further?\n4. What practical response follows from the message?\n\nFacilitator: verify that each question reflects the actual sermon.\n\nTranscript excerpt:\n" + opening, status: "Needs review" },
-      { id: "social", title: "Social captions", type: "Social content", content: "SOCIAL CAPTION — REVIEW DRAFT\n\nThis week’s message: " + (sermonTitle.trim() || "[Sermon title]") + "\n\nRevisit the teaching, reflect on the Scriptures, and consider how to put the message into practice.\n\nBefore publishing, replace this generic draft with a specific, accurate takeaway from the sermon.\n\nTranscript excerpt:\n" + opening, status: "Needs review" },
-    ]);
-    setActiveId("summary");
-    setNotice("Review drafts prepared from your transcript. These are structured working drafts, not AI-generated interpretations.");
+    setGenerating(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: sermonTitle, speaker, date, scripture, transcript }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not generate resources.");
+      const generated = data.resources;
+      setResources([
+        { id: "summary", title: "Sermon summary", type: "Summary", content: generated.summary, status: "Needs review" },
+        { id: "outline", title: "Sermon outline", type: "Outline", content: generated.outline, status: "Needs review" },
+        { id: "scriptures", title: "Scripture references", type: "Scripture list", content: generated.scriptures, status: "Needs review" },
+        { id: "devotional", title: "Devotional draft", type: "Devotional", content: generated.devotional, status: "Needs review" },
+        { id: "discussion", title: "Small-group guide", type: "Discussion guide", content: generated.discussion, status: "Needs review" },
+        { id: "social", title: "Social captions", type: "Social content", content: generated.social, status: "Needs review" },
+      ]);
+      setActiveId("summary");
+      setNotice("Six AI-assisted drafts are ready. Review every resource against the sermon before using or sharing it.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Something went wrong while preparing resources.");
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function updateActive(content: string) {
@@ -106,8 +121,8 @@ export default function Home() {
               <div className="transcript-head"><label htmlFor="transcript">Sermon transcript <span className="required">Required</span></label><span>{transcript.length.toLocaleString()} characters</span></div>
               <textarea id="transcript" value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Paste the sermon transcript here…&#10;&#10;For best results, include the full message and any Scripture references as preached." />
               <div className="transcript-foot"><span><span className="tiny-lock">✓</span> Your transcript stays in this browser session.</span><span>Text only · No upload required</span></div>
-              <button className="primary-button" onClick={prepareDrafts}><WandSparkles size={17} /> Prepare resource drafts <span>→</span></button>
-              <p className="button-note">This prototype creates structured review drafts locally. AI generation and cloud saving are not connected yet.</p>
+              <button className="primary-button" onClick={prepareDrafts} disabled={generating} aria-busy={generating}><WandSparkles size={17} /> {generating ? "Generating resources…" : "Generate sermon resources"} <span>→</span></button>
+              <p className="button-note">AI drafts are generated on the server. Add your API key in Vercel settings; all results require human review.</p>
             </section>
 
             <section className="panel resources-panel">
