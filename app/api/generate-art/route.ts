@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const style = clean(input.designStyle, 40);
   const backgroundColor = /^#[0-9a-f]{6}$/i.test(clean(input.backgroundColor, 7)) ? clean(input.backgroundColor, 7) : "#f4efe6";
   const accentColor = /^#[0-9a-f]{6}$/i.test(clean(input.accentColor, 7)) ? clean(input.accentColor, 7) : "#b6422e";
-  if (!headline || !text) return fail(400, "SLIDE_REQUIRED", "A slide headline and message are required to create artwork.");
+  if (!text) return fail(400, "SLIDE_REQUIRED", "This slide has no message text to illustrate.");
 
   const prompt = [
     "Create a sophisticated art-directed background illustration for one Instagram carousel slide, portrait 4:5 composition.",
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     "Keep the central-left and lower-middle zones visually quiet enough for high-contrast overlaid text; place important illustrative detail toward the outer edges or upper-right where appropriate.",
     "Design mood/style: " + (style || "editorial") + ". Base palette " + backgroundColor + " and accent " + accentColor + ". These are colour references, not a requirement for a flat background.",
     "Carousel title: " + title,
-    "Slide headline / meaning: " + headline,
+    "Slide headline / meaning: " + (headline || "No separate headline is supplied. Infer the central visual idea from the message text without adding any words to the artwork."),
     "Slide copy context: " + text,
     "Specific art direction: " + (direction || "Infer an apt visual metaphor from the slide's meaning."),
     "Avoid repetitive circles, generic gradients, random abstract blobs, clip art and overused corporate presentation aesthetics. The image should look deliberately commissioned for this exact message.",
@@ -54,7 +54,11 @@ export async function POST(request: Request) {
     const prediction = await predictionResponse.json().catch(() => null);
     if (!predictionResponse.ok) {
       if (predictionResponse.status === 401 || predictionResponse.status === 403) return fail(502, "ART_PROVIDER_AUTH_ERROR", "The image provider rejected REPLICATE_API_TOKEN. Check the server-side Vercel environment variable.");
-      return fail(502, "ART_PROVIDER_ERROR", "The image provider could not create artwork right now. Try again shortly.");
+      const providerMessage = typeof prediction?.detail === "string" ? prediction.detail : typeof prediction?.error === "string" ? prediction.error : "";
+      if (predictionResponse.status === 402) return fail(502, "ART_PROVIDER_BILLING", "The image service account has no available credit or billing is required. Check the Replicate account connected to this app.");
+      if (predictionResponse.status === 429) return fail(429, "ART_PROVIDER_RATE_LIMIT", "The image service is receiving too many requests. Wait a little, then retry this slide.");
+      if (predictionResponse.status >= 500) return fail(502, "ART_PROVIDER_BUSY", "The image service is temporarily unavailable. Your text is safe; retry this slide in a moment.");
+      return fail(502, "ART_PROVIDER_ERROR", providerMessage ? "The image service rejected this request: " + providerMessage.slice(0, 220) : "The image service rejected this request. Check the Replicate account and model access, then retry.");
     }
 
     let output = prediction?.output;
