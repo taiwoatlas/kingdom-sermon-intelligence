@@ -88,7 +88,18 @@ export async function POST(request: Request) {
     return errorResponse(400, "INVALID_RESOURCE_SELECTION", "Choose one or more valid resources to generate.");
   }
 
-  const metadata = { title, speaker, date, userSuppliedScriptures: scripture };
+  const optionsInput = input.options && typeof input.options === "object" && !Array.isArray(input.options)
+    ? input.options as Record<string, unknown>
+    : {};
+  const audienceChoices = ["General congregation", "Youth and young adults", "Children and families", "Church leaders", "Small groups", "New believers", "Social media audience", "Bible study class"];
+  const toneChoices = ["Pastoral and warm", "Teaching and explanatory", "Bold and exhortational", "Reflective and devotional", "Simple and accessible"];
+  const languageChoices = ["English", "Nigerian Pidgin", "Yoruba", "French", "Spanish", "Portuguese", "Arabic", "Chinese", "Russian", "Indonesian", "Filipino"];
+  const platformChoices = ["Instagram", "Facebook", "WhatsApp", "TikTok", "YouTube", "All platforms"];
+  const audience = typeof optionsInput.audience === "string" && audienceChoices.includes(optionsInput.audience) ? optionsInput.audience : "General congregation";
+  const tone = typeof optionsInput.tone === "string" && toneChoices.includes(optionsInput.tone) ? optionsInput.tone : "Pastoral and warm";
+  const language = typeof optionsInput.language === "string" && languageChoices.includes(optionsInput.language) ? optionsInput.language : "English";
+  const platforms = typeof optionsInput.platforms === "string" && platformChoices.includes(optionsInput.platforms) ? optionsInput.platforms : "All platforms";
+  const metadata = { title, speaker, date, userSuppliedScriptures: scripture, generationOptions: { audience, tone, language, socialPlatforms: platforms } };
   try {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -105,7 +116,7 @@ export async function POST(request: Request) {
           { role: "system", content: SYSTEM_PROMPT },
           {
             role: "user",
-            content: "Create draft resources with exactly these ids: " + requestedIds.join(", ") + ". Generate only those requested resources; do not generate the others. Use the metadata only as supplied; do not treat it as proof of any sermon claim.\nMETADATA:\n" +
+            content: "Create draft resources with exactly these ids: " + requestedIds.join(", ") + ". Generate only those requested resources; do not generate the others. Follow these creative settings carefully: write in " + language + "; target audience: " + audience + "; editorial tone: " + tone + "; social platforms: " + platforms + ". Preserve the sermon meaning while adapting vocabulary and examples to the audience. For languages other than English, write the resource content in the selected language while preserving proper names and Bible references accurately. Keep Scripture references traceable and flag uncertain translations/references for human review. Use the metadata only as supplied; do not treat it as proof of any sermon claim.\nMETADATA:\n" +
               JSON.stringify(metadata) + "\n\nBEGIN UNTRUSTED SERMON TRANSCRIPT\n" + transcript + "\nEND UNTRUSTED SERMON TRANSCRIPT",
           },
         ],
