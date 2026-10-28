@@ -7,6 +7,14 @@ type Revision = { id: string; resourceId: string; title: string; content: string
 type Resource = { id: string; title: string; type: string; content: string; status: "Draft" | "Needs review" | "Approved"; approvedAt?: string; approvedBy?: string };
 type SavedSermon = { id: string; title: string; speaker: string; scripture: string; date: string; transcript: string; resources: Resource[]; revisions?: Record<string, Revision[]>; updatedAt: string };
 
+const RESOURCE_CHOICES = [
+  { id: "summary", label: "Sermon summary" }, { id: "outline", label: "Sermon outline" }, { id: "scriptures", label: "Scripture references" }, { id: "devotional", label: "Devotional" }, { id: "discussion", label: "Small-group guide" }, { id: "social", label: "Social captions" }, { id: "quotes", label: "Quote candidates" }, { id: "slides", label: "Slide outline" },
+];
+const AUDIENCE_CHOICES = ["General congregation", "Youth and young adults", "Children and families", "Church leaders", "Small groups", "New believers", "Social media audience", "Bible study class"];
+const TONE_CHOICES = ["Pastoral and warm", "Teaching and explanatory", "Bold and exhortational", "Reflective and devotional", "Simple and accessible"];
+const LANGUAGE_CHOICES = ["English", "Nigerian Pidgin", "Yoruba", "French", "Spanish", "Portuguese", "Arabic", "Chinese", "Russian", "Indonesian", "Filipino"];
+const PLATFORM_CHOICES = ["All platforms", "Instagram", "Facebook", "WhatsApp", "TikTok", "YouTube"];
+
 const starterResources: Resource[] = [
   { id: "summary", title: "Sermon summary", type: "Summary", content: "Add a sermon transcript and generate a summary grounded in the actual message.", status: "Draft" },
   { id: "outline", title: "Sermon outline", type: "Outline", content: "A structured outline will appear here after generation.", status: "Draft" },
@@ -34,6 +42,11 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>(RESOURCE_CHOICES.map((item) => item.id));
+  const [audience, setAudience] = useState("General congregation");
+  const [tone, setTone] = useState("Pastoral and warm");
+  const [outputLanguage, setOutputLanguage] = useState("English");
+  const [socialPlatforms, setSocialPlatforms] = useState("All platforms");
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     try {
@@ -45,6 +58,11 @@ export default function Home() {
         if (typeof data.scripture === "string") setScripture(data.scripture);
         if (typeof data.date === "string") setDate(data.date);
         if (typeof data.transcript === "string") setTranscript(data.transcript);
+        if (Array.isArray(data.selectedResourceIds) && data.selectedResourceIds.every((id: unknown) => typeof id === "string" && RESOURCE_CHOICES.some((choice) => choice.id === id))) setSelectedResourceIds(data.selectedResourceIds);
+        if (typeof data.audience === "string" && AUDIENCE_CHOICES.includes(data.audience)) setAudience(data.audience);
+        if (typeof data.tone === "string" && TONE_CHOICES.includes(data.tone)) setTone(data.tone);
+        if (typeof data.outputLanguage === "string" && LANGUAGE_CHOICES.includes(data.outputLanguage)) setOutputLanguage(data.outputLanguage);
+        if (typeof data.socialPlatforms === "string" && PLATFORM_CHOICES.includes(data.socialPlatforms)) setSocialPlatforms(data.socialPlatforms);
         if (Array.isArray(data.resources) && data.resources.every((r: Resource) => typeof r.id === "string" && typeof r.content === "string")) setResources(data.resources);
         if (data.revisions && typeof data.revisions === "object" && !Array.isArray(data.revisions)) setRevisions(data.revisions);
       }
@@ -54,9 +72,9 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (!hydrated) return;
-    try { localStorage.setItem("kingdom-sermon-intelligence-v1", JSON.stringify({ sermonTitle, speaker, scripture, date, transcript, resources, revisions })); }
+    try { localStorage.setItem("kingdom-sermon-intelligence-v1", JSON.stringify({ sermonTitle, speaker, scripture, date, transcript, resources, revisions, selectedResourceIds, audience, tone, outputLanguage, socialPlatforms })); }
     catch { setNotice("Your browser could not save more local data. Export important drafts as text files."); }
-  }, [hydrated, sermonTitle, speaker, scripture, date, transcript, resources, revisions]);
+  }, [hydrated, sermonTitle, speaker, scripture, date, transcript, resources, revisions, selectedResourceIds, audience, tone, outputLanguage, socialPlatforms]);
 
   useEffect(() => { if (!hydrated) return; try { localStorage.setItem("kingdom-sermon-library-v1", JSON.stringify(library)); } catch { setNotice("The browser could not save the full library. Export your sermon pack for safekeeping."); } }, [hydrated, library]);
 
@@ -87,6 +105,7 @@ export default function Home() {
 
   async function prepareDrafts() {
     const raw = transcript.trim();
+    if (selectedResourceIds.length === 0) { setNotice("Select at least one resource to generate."); return; }
     if (!sermonTitle.trim()) { setNotice("Enter a sermon title before generating resources."); return; }
     if (!raw) { setNotice("Paste the sermon transcript before generating resources."); return; }
     if (raw.length > 16000) { setNotice("This free-tier generation workflow supports up to 16,000 transcript characters per request. Split a longer sermon into sections."); return; }
@@ -97,20 +116,21 @@ export default function Home() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: sermonTitle.trim(), speaker: speaker.trim(), scripture: scripture.trim(), date, transcript: raw }),
+        body: JSON.stringify({ title: sermonTitle.trim(), speaker: speaker.trim(), scripture: scripture.trim(), date, transcript: raw, resourceIds: selectedResourceIds, options: { audience, tone, language: outputLanguage, platforms: socialPlatforms } }),
       });
       const result = await response.json();
       if (!response.ok) {
         setNotice(result?.error?.message || "Generation failed. Your transcript is still available; please try again.");
         return;
       }
-      if (!Array.isArray(result.resources) || result.resources.length !== 8) {
-        setNotice("The server returned an incomplete resource pack. Your existing drafts were not overwritten.");
+      if (!Array.isArray(result.resources) || result.resources.length !== selectedResourceIds.length || !selectedResourceIds.every((id) => result.resources.some((item: Resource) => item.id === id))) {
+        setNotice("The server returned an incomplete selected resource set. Your existing drafts were not overwritten.");
         return;
       }
-      setResources(result.resources);
-      setActiveId("summary");
-      setNotice("AI generated all eight resource drafts. Review each against the sermon before approving or sharing. Nothing has been published.");
+      const generated = result.resources as Resource[];
+      setResources((old) => [...old.filter((item) => !selectedResourceIds.includes(item.id)), ...generated].sort((a, b) => RESOURCE_CHOICES.findIndex((choice) => choice.id === a.id) - RESOURCE_CHOICES.findIndex((choice) => choice.id === b.id)));
+      setActiveId(generated[0]?.id || "summary");
+      setNotice("Generated " + generated.length + " selected resource draft(s) using your audience, tone and language settings. Review each against the sermon before sharing.");
     } catch {
       setNotice("Could not reach the generation endpoint. Your transcript is still in the editor; check your connection and try again.");
     } finally {
@@ -130,7 +150,7 @@ export default function Home() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: sermonTitle.trim(), speaker: speaker.trim(), scripture: scripture.trim(), date, transcript: raw, resourceIds: [activeId] }),
+        body: JSON.stringify({ title: sermonTitle.trim(), speaker: speaker.trim(), scripture: scripture.trim(), date, transcript: raw, resourceIds: [activeId], options: { audience, tone, language: outputLanguage, platforms: socialPlatforms } }),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -306,7 +326,17 @@ export default function Home() {
               <div className="transcript-head"><label htmlFor="transcript">Sermon transcript <span className="required">Required</span></label><div className="transcript-tools"><span>{transcript.length.toLocaleString()} characters</span><button className="text-button" onClick={() => document.getElementById("transcript-file")?.click()}>Import .txt</button><input id="transcript-file" type="file" accept=".txt,text/plain" hidden onChange={(e) => { void importTranscriptText(e.target.files?.[0]); e.currentTarget.value = ""; }} /></div></div>
               <textarea id="transcript" value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Paste the sermon transcript here…&#10;&#10;For best results, include the full message and any Scripture references as preached." maxLength={16000} />
               <div className="transcript-foot"><span><span className="tiny-lock">✓</span> Your transcript is saved in this browser only.</span><span>Text only · Up to 16,000 characters</span></div>
-              <button className="primary-button" onClick={prepareDrafts} disabled={generating} aria-busy={generating}><WandSparkles size={17} /> {generating ? "Generating resources…" : "Generate sermon resources"} <span>→</span></button>
+              <section className="generation-controls">
+                <div className="generation-controls-heading"><div><b>Build your content pack</b><small>Choose exactly what the AI should create.</small></div><button type="button" className="text-button" onClick={() => setSelectedResourceIds(RESOURCE_CHOICES.map((item) => item.id))}>Select all</button></div>
+                <div className="generation-resource-grid">{RESOURCE_CHOICES.map((item) => <label className="generation-choice" key={item.id}><input type="checkbox" checked={selectedResourceIds.includes(item.id)} onChange={(e) => setSelectedResourceIds((old) => e.target.checked ? [...old, item.id] : old.filter((id) => id !== item.id))} /><span>{item.label}</span></label>)}</div>
+                <div className="generation-settings">
+                  <label className="field"><span>Target audience</span><select value={audience} onChange={(e) => setAudience(e.target.value)}>{AUDIENCE_CHOICES.map((item) => <option key={item}>{item}</option>)}</select></label>
+                  <label className="field"><span>Writing tone</span><select value={tone} onChange={(e) => setTone(e.target.value)}>{TONE_CHOICES.map((item) => <option key={item}>{item}</option>)}</select></label>
+                  <label className="field"><span>Output language</span><select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>{LANGUAGE_CHOICES.map((item) => <option key={item}>{item}</option>)}</select></label>
+                  <label className="field"><span>Social platforms</span><select value={socialPlatforms} onChange={(e) => setSocialPlatforms(e.target.value)}>{PLATFORM_CHOICES.map((item) => <option key={item}>{item}</option>)}</select></label>
+                </div>
+              </section>
+              <button className="primary-button" onClick={prepareDrafts} disabled={generating || selectedResourceIds.length === 0} aria-busy={generating}><WandSparkles size={17} /> {generating ? "Generating content…" : "Generate selected content"} <span>→</span></button>
               <p className="button-note">Uses the configured server-side AI provider free tier. A Groq free-plan key must be configured in Vercel; paid usage is not enabled. Every output requires human review.</p>
             </section>
 
