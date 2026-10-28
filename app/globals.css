@@ -27,3 +27,10 @@
 .revision-copy small{display:block;color:#8a948c;font-size:9px;margin-top:4px}
 .revision-copy p{font-size:10px;line-height:1.5;color:#657168;margin:6px 0 0;overflow-wrap:anywhere}
 @media(max-width:700px){.revision-heading h3{font-size:11px}.revision-heading p{font-size:9px}.revision-item{align-items:flex-start;padding:9px;gap:7px}.revision-copy small{line-height:1.5}.revision-item .secondary-button{flex:0 0 auto}}
+
+
+/* Transcript import controls */
+.transcript-tools{display:flex;align-items:center;gap:12px}
+.transcript-tools>span{font-size:9px;color:#9aa39b;white-space:nowrap}
+.transcript-tools .text-button{border:1px solid #dfe8df;border-radius:6px;padding:6px 8px;background:#f9fbf9;white-space:nowrap}
+@media(max-width:380px){.transcript-tools{gap:6px}.transcript-tools>span{font-size:8px}.transcript-tools .text-button{padding:5px 6px;font-size:8px}}
