@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHandshake, Lightbulb, ListChecks, Menu, MessageCircle, Mic2, Plus, Search, Settings2, Share2, Sparkles, WandSparkles } from "lucide-react";
 
 type Resource = { id: string; title: string; type: string; content: string; status: "Draft" | "Needs review" | "Approved" };
@@ -26,41 +26,60 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("kingdom-sermon-intelligence-v1");
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (typeof data.sermonTitle === "string") setSermonTitle(data.sermonTitle);
+        if (typeof data.speaker === "string") setSpeaker(data.speaker);
+        if (typeof data.scripture === "string") setScripture(data.scripture);
+        if (typeof data.date === "string") setDate(data.date);
+        if (typeof data.transcript === "string") setTranscript(data.transcript);
+        if (Array.isArray(data.resources) && data.resources.every((r: Resource) => typeof r.id === "string" && typeof r.content === "string")) setResources(data.resources);
+      }
+    } catch { /* Ignore malformed local data. */ }
+    setHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    try { localStorage.setItem("kingdom-sermon-intelligence-v1", JSON.stringify({ sermonTitle, speaker, scripture, date, transcript, resources })); }
+    catch { setNotice("Your browser could not save more local data. Export important drafts as text files."); }
+  }, [hydrated, sermonTitle, speaker, scripture, date, transcript, resources]);
 
   const active = resources.find((r) => r.id === activeId) ?? resources[0];
   const filtered = useMemo(() => resources.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()) || r.type.toLowerCase().includes(query.toLowerCase())), [resources, query]);
 
-  async function prepareDrafts() {
-    if (!transcript.trim()) {
+  function prepareDrafts() {
+    const raw = transcript.trim();
+    if (!raw) {
       setNotice("Add the sermon transcript first. Drafts should be grounded in the actual message.");
       return;
     }
     setGenerating(true);
-    setNotice("");
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: sermonTitle, speaker, date, scripture, transcript }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not generate resources.");
-      const generated = data.resources;
-      setResources([
-        { id: "summary", title: "Sermon summary", type: "Summary", content: generated.summary, status: "Needs review" },
-        { id: "outline", title: "Sermon outline", type: "Outline", content: generated.outline, status: "Needs review" },
-        { id: "scriptures", title: "Scripture references", type: "Scripture list", content: generated.scriptures, status: "Needs review" },
-        { id: "devotional", title: "Devotional draft", type: "Devotional", content: generated.devotional, status: "Needs review" },
-        { id: "discussion", title: "Small-group guide", type: "Discussion guide", content: generated.discussion, status: "Needs review" },
-        { id: "social", title: "Social captions", type: "Social content", content: generated.social, status: "Needs review" },
-      ]);
-      setActiveId("summary");
-      setNotice("Six AI-assisted drafts are ready. Review every resource against the sermon before using or sharing it.");
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Something went wrong while preparing resources.");
-    } finally {
-      setGenerating(false);
-    }
+    const normalized = raw.replace(/\r/g, "").replace(/[ \t]+/g, " ");
+    const sentences = (normalized.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || []).map((s) => s.trim()).filter((s) => s.length > 25);
+    const paragraphs = normalized.split(/\n+/).map((p) => p.trim()).filter((p) => p.length > 25);
+    const useful = sentences.length ? sentences : paragraphs;
+    const excerpt = useful.slice(0, 5).map((s, i) => String(i + 1) + ". " + s).join("\n");
+    const firstPass = useful.slice(0, 3).join(" ");
+    const refs = Array.from(new Set((raw.match(/\b(?:Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|1\s?Samuel|2\s?Samuel|1\s?Kings|2\s?Kings|Psalms?|Proverbs|Ecclesiastes|Isaiah|Jeremiah|Ezekiel|Daniel|Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|Zechariah|Malachi|Matthew|Mark|Luke|John|Acts|Romans|1\s?Corinthians|2\s?Corinthians|Galatians|Ephesians|Philippians|Colossians|1\s?Thessalonians|2\s?Thessalonians|1\s?Timothy|2\s?Timothy|Titus|Philemon|Hebrews|James|1\s?Peter|2\s?Peter|1\s?John|2\s?John|3\s?John|Jude|Revelation)\s+\d{1,3}(?::\d{1,3}(?:[-–]\d{1,3})?)?/gi) || []));
+    const scriptureText = refs.length ? refs.join(", ") : "No clearly formatted Bible references were detected automatically. Check the transcript manually; this tool will not guess missing references.";
+    const title = sermonTitle.trim() || "Untitled sermon";
+    const heading = "SERMON: " + title + "\n" + (speaker.trim() ? "SPEAKER: " + speaker.trim() + "\n" : "") + (date ? "DATE: " + date + "\n" : "") + (scripture.trim() ? "USER-SUPPLIED SCRIPTURES: " + scripture.trim() + "\n" : "");
+    const nextResources: Resource[] = [
+      { id: "summary", title: "Sermon summary", type: "Summary", content: heading + "SUMMARY WORKING DRAFT\n\nThis free, local tool does not use a paid AI service. It has extracted the opening statements below to help you begin a summary. Edit this into a faithful account of the sermon’s central message, supporting teaching, and intended response.\n\nOPENING EXTRACT\n" + (firstPass || raw.slice(0, 1800)), status: "Needs review" },
+      { id: "outline", title: "Sermon outline", type: "Outline", content: heading + "OUTLINE WORKING DRAFT\n\nReview the sermon and group these extracted statements into the preacher’s actual main points. This is automatic text extraction, not an interpretation.\n\n" + (excerpt || raw.slice(0, 1800)) + "\n\nMAIN POINT 1: [Edit from the sermon]\nMAIN POINT 2: [Edit from the sermon]\nPRACTICAL RESPONSE: [Edit from the sermon]", status: "Needs review" },
+      { id: "scriptures", title: "Scripture references", type: "Scripture list", content: heading + "SCRIPTURE REFERENCE CHECK\n\nReferences detected by simple text matching:\n" + scriptureText + "\n\nVerify each reference against the transcript and Bible translation. This basic matcher can miss references or misread formatting; it does not verify verse contents.", status: "Needs review" },
+      { id: "devotional", title: "Devotional draft", type: "Devotional", content: heading + "DEVOTIONAL WORKING TEMPLATE\n\nKEY TRUTH\n[Identify the central biblical truth from the sermon.]\n\nREFLECTION\n" + (firstPass || "[Summarise the sermon’s key teaching in your own words.]") + "\n\nPERSONAL APPLICATION\n[Write a practical response that follows from the actual message.]\n\nPRAYER\n[Write a prayer grounded in the sermon and its Scriptures.]", status: "Needs review" },
+      { id: "discussion", title: "Small-group guide", type: "Discussion guide", content: heading + "SMALL-GROUP DISCUSSION\n\n1. What did you understand to be the central message of this sermon?\n2. Which Scripture or teaching in the message stood out to you, and why?\n3. What part of the message would you like to study more carefully?\n4. What practical response follows from the sermon?\n5. How can the group encourage one another to live out this teaching?\n\nLeader note: tailor these questions to the actual sermon before use.", status: "Needs review" },
+      { id: "social", title: "Social captions", type: "Social content", content: heading + "SOCIAL CAPTION WORKING DRAFT\n\nThis week’s message: " + title + ".\n\nKey takeaway: [Insert one accurate, memorable point from the sermon.]\nScripture: " + (scripture.trim() || refs[0] || "[Verify the sermon’s Scripture reference]") + "\n\nReview the wording against the sermon before publishing. Add your church’s preferred details and approved link manually.", status: "Needs review" },
+    ];
+    setResources(nextResources);
+    setActiveId("summary");
+    setGenerating(false);
+    setNotice("Six working drafts prepared offline. No AI service or paid API was used; edit each draft against the sermon before sharing.");
   }
 
   function updateActive(content: string) {
@@ -120,9 +139,9 @@ export default function Home() {
               <div className="form-grid"><label className="field full"><span>Sermon title</span><input value={sermonTitle} onChange={(e) => setSermonTitle(e.target.value)} placeholder="e.g. Faith That Moves Forward" /></label><label className="field"><span>Speaker</span><input value={speaker} onChange={(e) => setSpeaker(e.target.value)} placeholder="Pastor / speaker" /></label><label className="field"><span>Date preached</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label className="field full"><span>Key Scripture references</span><input value={scripture} onChange={(e) => setScripture(e.target.value)} placeholder="e.g. Hebrews 11:1–6" /></label></div>
               <div className="transcript-head"><label htmlFor="transcript">Sermon transcript <span className="required">Required</span></label><span>{transcript.length.toLocaleString()} characters</span></div>
               <textarea id="transcript" value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Paste the sermon transcript here…&#10;&#10;For best results, include the full message and any Scripture references as preached." />
-              <div className="transcript-foot"><span><span className="tiny-lock">✓</span> Your transcript stays in this browser session.</span><span>Text only · No upload required</span></div>
+              <div className="transcript-foot"><span><span className="tiny-lock">✓</span> Your transcript is saved in this browser only.</span><span>Text only · No upload required</span></div>
               <button className="primary-button" onClick={prepareDrafts} disabled={generating} aria-busy={generating}><WandSparkles size={17} /> {generating ? "Generating resources…" : "Generate sermon resources"} <span>→</span></button>
-              <p className="button-note">AI drafts are generated on the server. Add your API key in Vercel settings; all results require human review.</p>
+              <p className="button-note">Runs locally in your browser. No paid AI API or key is required; all drafts require human review.</p>
             </section>
 
             <section className="panel resources-panel">
@@ -137,7 +156,7 @@ export default function Home() {
             <div className="editor-top"><div className="editor-title"><div className="heading-icon blue"><FileText size={18} /></div><div><h2>{active.title}</h2><p>{sermonTitle.trim() || "Untitled sermon"}{speaker.trim() ? " · " + speaker.trim() : ""}{date ? " · " + date : ""}</p></div></div><div className="editor-actions"><button className="secondary-button" onClick={copyDraft}><Clipboard size={15} /> Copy</button><button className="secondary-button" onClick={downloadDraft}><Download size={15} /> Export .txt</button><button className="approve-button" onClick={markApproved}><Check size={16} /> Approve draft</button></div></div>
             <div className="editor-label"><span>EDITABLE CONTENT</span><span className={`status status-${active.status.toLowerCase().replace(" ", "-")}`}>{active.status}</span></div>
             <textarea className="draft-editor" aria-label="Edit selected resource" value={active.content} onChange={(e) => updateActive(e.target.value)} />
-            <div className="editor-footer"><span><span className="tiny-lock">✓</span> Changes are held in this browser session only.</span><button className="text-button" onClick={() => { setResources((old) => old.map((r) => r.id === activeId ? { ...r, content: "" , status: "Draft" } : r)); setNotice("Draft cleared."); }}><Plus size={14} /> Clear draft</button></div>
+            <div className="editor-footer"><span><span className="tiny-lock">✓</span> Changes are saved in this browser only.</span><button className="text-button" onClick={() => { setResources((old) => old.map((r) => r.id === activeId ? { ...r, content: "" , status: "Draft" } : r)); setNotice("Draft cleared."); }}><Plus size={14} /> Clear draft</button></div>
           </section>
 
           <div className="bottom-note"><div className="bottom-note-icon"><HeartHandshake size={19} /></div><div><b>Built to serve the local church.</b><p>Kingdom Sermon Intelligence assists ministry work; it does not replace the preacher’s voice, biblical study, pastoral discernment, or human review.</p></div><div className="bottom-note-mark"><BookOpen size={23} /></div></div>
