@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import CarouselStudio from "./components/CarouselStudio";
-import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHandshake, Lightbulb, ListChecks, Menu, MessageCircle, Mic2, Plus, RefreshCw, Search, Settings2, Share2, Sparkles, WandSparkles } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Clipboard, Download, FileText, HeartHandshake, Image as ImageIcon, Lightbulb, ListChecks, Menu, MessageCircle, Mic2, Plus, RefreshCw, Search, Settings2, Share2, Sparkles, WandSparkles } from "lucide-react";
 
 type Revision = { id: string; resourceId: string; title: string; content: string; status: "Draft" | "Needs review" | "Approved"; action: string; createdAt: string; actor: string };
 type Resource = { id: string; title: string; type: string; content: string; status: "Draft" | "Needs review" | "Approved"; approvedAt?: string; approvedBy?: string };
@@ -318,7 +318,7 @@ export default function Home() {
         <div className="brand"><div className="brand-mark"><BookOpen size={21} /></div><div><strong>Kingdom</strong><span>SERMON INTELLIGENCE</span></div></div>
         <button className="workspace-select"><span className="workspace-avatar">K</span><span className="workspace-copy"><b>Church workspace</b><small>Personal workspace</small></span><ChevronDown size={16} /></button>
         <div className="nav-label">WORKSPACE</div>
-        <button className="nav-item active"><FileText size={18} /> Sermon studio</button>
+        <Link href="/" className="nav-item active"><FileText size={18} /> Sermon studio</Link><Link href="/visual-content" className="nav-item"><ImageIcon size={18} /> Visual content creator</Link>
         <button className="nav-item" onClick={() => document.getElementById("sermon-library")?.scrollIntoView({ behavior: "smooth" })}><BookOpen size={18} /> Sermon library <span className="soon">{library.length}</span></button>
         <button className="nav-item" onClick={() => setNotice("Team collaboration is planned for a later version.")}><HeartHandshake size={18} /> Team &amp; ministry <span className="soon">SOON</span></button>
         <div className="nav-label nav-label-spaced">YOUR RESOURCES</div>
