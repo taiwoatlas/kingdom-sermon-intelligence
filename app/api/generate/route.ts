@@ -105,7 +105,7 @@ export async function POST(request: Request) {
           { role: "system", content: SYSTEM_PROMPT },
           {
             role: "user",
-            content: "Create the eight requested draft resources from this sermon. Use the metadata only as supplied; do not treat it as proof of any sermon claim.\nMETADATA:\n" +
+            content: "Create draft resources with exactly these ids: " + requestedIds.join(", ") + ". Generate only those requested resources; do not generate the others. Use the metadata only as supplied; do not treat it as proof of any sermon claim.\nMETADATA:\n" +
               JSON.stringify(metadata) + "\n\nBEGIN UNTRUSTED SERMON TRANSCRIPT\n" + transcript + "\nEND UNTRUSTED SERMON TRANSCRIPT",
           },
         ],
