@@ -141,7 +141,7 @@ export async function POST(request: Request) {
     );
 
     const ids = new Set(resources.map((item) => item.id as string));
-    if (resources.length !== 8 || ids.size !== 8 || [...ALLOWED_IDS].some((id) => !ids.has(id))) {
+    if (resources.length !== 8 || ids.size !== 8 || ["summary", "outline", "scriptures", "devotional", "discussion", "social", "quotes", "slides"].some((id) => !ids.has(id))) {
       return errorResponse(502, "INVALID_AI_OUTPUT", "The AI response was missing one or more required resources. Try again; no draft was overwritten.");
     }
 
