@@ -51,6 +51,7 @@ export default function Home() {
   const [outputLanguage, setOutputLanguage] = useState("English");
   const [socialPlatforms, setSocialPlatforms] = useState("All platforms");
   const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { if (activeId === "carousel") document.getElementById("visual-carousel-studio")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [activeId]);
   useEffect(() => {
     try {
       const saved = localStorage.getItem("kingdom-sermon-intelligence-v1");
@@ -329,7 +330,7 @@ export default function Home() {
         <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu"><Menu size={20} /></button><div className="breadcrumb">Workspace <span>/</span> <b>Sermon studio</b></div><div className="topbar-right"><span className="local-badge"><span /> Free AI mode</span><button className="icon-button" aria-label="Settings" onClick={() => setNotice("AI generation uses the Groq free plan. Add GROQ_API_KEY in Vercel Environment Variables; the key stays on the server. Do not upgrade to a paid plan.")}><Settings2 size={18} /></button><div className="profile">TA</div></div></header>
 
         <div className="page-content">
-          <div className="welcome-row"><div><div className="eyebrow"><Sparkles size={14} /> YOUR SERMON, MULTIPLIED WITH CARE</div><h1>Make more of every message.</h1><p className="intro">Turn your sermon into useful church resources while keeping the original message at the centre.</p></div><div className="welcome-icon"><Mic2 size={28} /></div></div>
+          <div className="welcome-row"><div><div className="eyebrow"><Sparkles size={14} /> YOUR SERMON, MULTIPLIED WITH CARE</div><h1>Make more of every message.</h1><p className="intro">Turn your sermon into useful church resources while keeping the original message at the centre.</p><button className="visual-studio-cta" onClick={() => setActiveId("carousel")}><WandSparkles size={17} /> Open Visual Carousel Studio <span>→</span></button></div><div className="welcome-icon"><Mic2 size={28} /></div></div>
 
           <section className="panel library-panel" id="sermon-library">
             <div className="panel-heading"><div className="heading-icon green"><BookOpen size={18} /></div><div><h2>Sermon library</h2><p>Save, reopen, search and export sermons on this device.</p></div><span className="count-pill">{library.length} saved</span></div>
@@ -368,7 +369,7 @@ export default function Home() {
             </section>
           </div>
 
-          {activeId === "carousel" && <CarouselStudio content={active.content} title={sermonTitle} onChange={updateActive} />}
+          <div id="visual-carousel-studio" className={activeId === "carousel" ? "visual-studio-visible" : "visual-studio-hidden"}>{activeId === "carousel" && <CarouselStudio content={active.content} title={sermonTitle} onChange={updateActive} />}</div>
 
           <section className="panel editor-panel">
             <div className="editor-top"><div className="editor-title"><div className="heading-icon blue"><FileText size={18} /></div><div><h2>{active.title}</h2><p>{sermonTitle.trim() || "Untitled sermon"}{speaker.trim() ? " · " + speaker.trim() : ""}{date ? " · " + date : ""}</p></div></div><div className="editor-actions"><button className="secondary-button" onClick={copyDraft}><Clipboard size={15} /> Copy</button><button className="secondary-button" onClick={downloadDraft}><Download size={15} /> Export .txt</button><button className="secondary-button" onClick={exportResourcePack}><Download size={15} /> Full pack</button><button className="secondary-button" onClick={regenerateActiveResource} disabled={generating || !transcript.trim()}><RefreshCw size={15} /> {generating ? "Working…" : "Regenerate this resource"}</button><button className="secondary-button" onClick={saveActiveRevision}><FileText size={15} /> Save version</button><button className="approve-button" onClick={markApproved}><Check size={16} /> Approve draft</button></div></div>
