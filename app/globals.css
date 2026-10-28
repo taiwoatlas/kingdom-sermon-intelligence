@@ -138,3 +138,21 @@
  .visual-page .art-layout-3 .carousel-artboard p{font-size:clamp(15px,3.5vw,18px)}
  .visual-page .art-layout-4 .carousel-artboard p{max-width:90%;margin-left:4%}
 }
+
+
+/* Hybrid carousel design controls */
+.visual-page .carousel-theme-control{min-width:min(280px,100%);gap:7px}
+.visual-page .carousel-theme-control label:not(:first-child){margin-top:5px}
+.visual-page .carousel-theme-control select{width:100%;min-height:38px;border:1px solid #dce6dc;border-radius:8px;padding:9px 11px;background:#fff;color:#2c3d31;font:inherit;font-size:11px;outline:none}
+.visual-page .carousel-theme-control select:focus{border-color:#6da780;box-shadow:0 0 0 3px #26734d12}
+.visual-page .carousel-deck-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.visual-page .carousel-deck-actions .primary-button{width:auto;margin:0;white-space:nowrap}
+.visual-page .carousel-canva-note{display:flex;align-items:flex-start;gap:7px;margin:10px 0 0;color:#718076;font-size:10px;line-height:1.55}
+.visual-page .carousel-canva-note svg{flex:0 0 auto;margin-top:1px;color:#26734d}
+@media(max-width:760px){
+ .visual-page .carousel-studio-heading{align-items:stretch;flex-direction:column}
+ .visual-page .carousel-theme-control{width:100%;min-width:0}
+ .visual-page .carousel-deck-footer{align-items:stretch;flex-direction:column}
+ .visual-page .carousel-deck-actions{display:grid;grid-template-columns:1fr}
+ .visual-page .carousel-deck-actions .primary-button{width:100%}
+}
