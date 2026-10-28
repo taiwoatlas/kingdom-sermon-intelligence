@@ -24,7 +24,7 @@ THEOLOGICAL CARE
 Do not claim divine authority or present your interpretation as the final theological position of a church. Preserve the preacher's argument and sequence. Distinguish the preacher's stated teaching from optional editorial suggestions. Do not fabricate exact Scripture quotations. List detected references with context and mark them needs_review; detection is not verification. For quote candidates, only provide exact excerpts that appear verbatim in the transcript; if uncertain, omit them or label as paraphrase. Do not invent church details, service times, links, hashtags implying facts, or endorsements.
 
 OUTPUT
-Return one valid JSON object only, with a "resources" array containing exactly eight objects, one for each id: summary, outline, scriptures, devotional, discussion, social, quotes, slides. Each object must contain: id, title, type, content. Content must be useful, specific to this transcript, and editable. Do not include markdown fences. Every item is a draft requiring human review.
+Return one valid JSON object only, with a "resources" array containing exactly the requested resources. The user request lists the required ids; include each requested id exactly once and do not include other ids. Each object must contain: id, title, type, content. Content must be useful, specific to this transcript, and editable. Do not include markdown fences. Every item is a draft requiring human review.
 
 RESOURCE REQUIREMENTS
 - summary: title, central message, concise summary, audience relevance, and any uncertainty notes.
@@ -74,6 +74,18 @@ export async function POST(request: Request) {
   if (!transcript) return errorResponse(400, "TRANSCRIPT_REQUIRED", "Paste the sermon transcript before generating resources.");
   if (transcript.length > MAX_TRANSCRIPT_CHARS) {
     return errorResponse(413, "TRANSCRIPT_TOO_LONG", "This free-plan workflow currently accepts up to 16,000 transcript characters per generation. Shorten the transcript or split it into sections.");
+  }
+
+  const allowedIds = ["summary", "outline", "scriptures", "devotional", "discussion", "social", "quotes", "slides"];
+  const requestedIds = input.resourceIds === undefined
+    ? allowedIds
+    : Array.isArray(input.resourceIds) && input.resourceIds.length > 0 &&
+      input.resourceIds.every((id) => typeof id === "string" && allowedIds.includes(id)) &&
+      new Set(input.resourceIds).size === input.resourceIds.length
+      ? input.resourceIds as string[]
+      : null;
+  if (!requestedIds) {
+    return errorResponse(400, "INVALID_RESOURCE_SELECTION", "Choose one or more valid resources to generate.");
   }
 
   const metadata = { title, speaker, date, userSuppliedScriptures: scripture };
@@ -141,8 +153,8 @@ export async function POST(request: Request) {
     );
 
     const ids = new Set(resources.map((item) => item.id as string));
-    if (resources.length !== 8 || ids.size !== 8 || ["summary", "outline", "scriptures", "devotional", "discussion", "social", "quotes", "slides"].some((id) => !ids.has(id))) {
-      return errorResponse(502, "INVALID_AI_OUTPUT", "The AI response was missing one or more required resources. Try again; no draft was overwritten.");
+    if (resources.length !== requestedIds.length || ids.size !== requestedIds.length || requestedIds.some((id) => !ids.has(id))) {
+      return errorResponse(502, "INVALID_AI_OUTPUT", "The AI response was missing one or more requested resources. Try again; no draft was overwritten.");
     }
 
     return NextResponse.json({
