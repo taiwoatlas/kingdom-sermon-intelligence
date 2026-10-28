@@ -9,3 +9,21 @@
 /* Sermon library */
 .library-panel{margin:0 0 19px;padding:18px 20px}.library-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.library-actions .search-box{min-width:170px;max-width:280px}.library-list{display:flex;flex-direction:column;gap:6px}.library-item{display:flex;align-items:center;gap:10px;border:1px solid #e8ede8;border-radius:8px;padding:10px 12px}.library-open{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;text-align:left;border:0;background:transparent;color:var(--ink)}.library-open b{font-size:11px}.library-open small{font-size:9px;color:var(--muted)}.library-empty{font-size:10px;line-height:1.7;color:var(--muted);margin:4px 0 0;padding:13px;background:#f8faf8;border-radius:8px}
 @media(max-width:700px){.library-panel{padding:14px 12px}.library-actions{align-items:stretch}.library-actions .search-box{min-width:100%;max-width:none}.library-actions .secondary-button{flex:1;justify-content:center}.library-item{padding:9px 7px}.library-open small{font-size:8px}}
+
+
+/* Resource revision history and approval audit */
+.approval-audit{display:flex;align-items:center;gap:9px;margin-top:13px;padding:11px 12px;border:1px solid #d7e9dc;border-radius:8px;background:#f1f8f2;color:#267344}
+.approval-audit span,.approval-audit b,.approval-audit small{display:block}
+.approval-audit b{font-size:10px}
+.approval-audit small{font-size:9px;color:#6f8173;margin-top:3px}
+.revision-panel{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.revision-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.revision-heading h3{font-size:12px;margin:0;font-weight:800}
+.revision-heading p{font-size:10px;color:var(--muted);margin:5px 0 0}
+.revision-list{display:flex;flex-direction:column;gap:8px}
+.revision-item{display:flex;align-items:center;gap:12px;border:1px solid #e7ece7;border-radius:8px;padding:11px}
+.revision-copy{flex:1;min-width:0}
+.revision-copy b{display:block;font-size:10px}
+.revision-copy small{display:block;color:#8a948c;font-size:9px;margin-top:4px}
+.revision-copy p{font-size:10px;line-height:1.5;color:#657168;margin:6px 0 0;overflow-wrap:anywhere}
+@media(max-width:700px){.revision-heading h3{font-size:11px}.revision-heading p{font-size:9px}.revision-item{align-items:flex-start;padding:9px;gap:7px}.revision-copy small{line-height:1.5}.revision-item .secondary-button{flex:0 0 auto}}
